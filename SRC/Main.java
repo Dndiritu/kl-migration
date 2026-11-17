@@ -4,118 +4,199 @@ public class Main {
     public static void main(String[] args) {
 
         // =====================================
-        // 1. CREATE JOB OBJECTS
+        // 1. CREATE THE FIRST FIVE JOBS
         // =====================================
 
         Job job1 = new Job(
-            "KL_CUS_EXTRACT_01",
+            "KL_ORD_EXTRACT_01",
             "CMD",
-            "KL_CUSTOMER_FEEDS",
+            "KL_ORDERS_NIGHTLY",
             "finsvc",
-            "klx-app02",
+            "klx-app01",
             new String[] {}
         );
 
         Job job2 = new Job(
-            "KL_CUS_VALIDATE_02",
+            "kl orders validate 02",
             "CMD",
-            "KL_CUSTOMER_FEEDS",
-            "etlsvc",
-            "klx-db01",
-            new String[] {"KL_CUS_EXTRACT_01"}
+            "KL_ORDERS_NIGHTLY",
+            "batchsvc",
+            "klx-app02",
+            new String[] {"KL_ORD_EXTRACT_01"}
         );
 
         Job job3 = new Job(
-            "KL_CUS_TRANSFORM_03",
+            "KL_ORD_TRANSFORM_03",
             "CMD",
-            "KL_CUSTOMER_FEEDS",
-            "finsvc",
+            "KL_ORDERS_NIGHTLY",
+            "batchsvc",
             "klx-app01",
-            new String[] {"KL_CUS_VALIDATE_02"}
+            new String[] {"kl orders validate 02"}
         );
 
         Job job4 = new Job(
-            "KL_CUS_NOTIFY_06!",
+            "KL_ORD_LOAD_04",
             "CMD",
-            "KL_CUSTOMER_FEEDS",
-            "etlsvc",
-            "klx-app02",
-            new String[] {"KL_CUS_RECONCILE_05"}
+            "KL_ORDERS_NIGHTLY",
+            "batchsvc",
+            "klx-db01",
+            new String[] {"KL_ORD_TRANSFORM_03"}
+        );
+
+        Job job5 = new Job(
+            "KL_ORD_RECONCILE_05",
+            "CMD",
+            "KL_ORDERS_NIGHTLY",
+            "finsvc",
+            "klx-db01",
+            new String[] {"KL_ORD_TRANSFORM_3"}
         );
 
 
         // =====================================
-        // 2. PRINT JOB DESCRIPTIONS
+        // 2. CREATE THE CHAIN
         // =====================================
 
-        System.out.println("===== JOB DESCRIPTIONS =====");
-
-        job1.printDescription();
-        job2.printDescription();
-        job3.printDescription();
-        job4.printDescription();
-
-
-        // =====================================
-        // 3. JOB NAME VALIDATION
-        // =====================================
-
-        System.out.println("\n===== JOB NAME VALIDATION =====");
-
-        System.out.println(job1.getName() + ": " + job1.isNameValid());
-        System.out.println(job2.getName() + ": " + job2.isNameValid());
-        System.out.println(job3.getName() + ": " + job3.isNameValid());
-        System.out.println(job4.getName() + ": " + job4.isNameValid());
-
-
-        // =====================================
-        // 4. TEST GETTERS
-        // =====================================
-
-        System.out.println("\n===== TEST GETTERS =====");
-
-        System.out.println("Job name: " + job1.getName());
-        System.out.println("Job type: " + job1.getType());
-        System.out.println("Job chain: " + job1.getChain());
-        System.out.println("Job owner: " + job1.getOwner());
-        System.out.println("Job machine: " + job1.getMachine());
-
-
-        // =====================================
-        // 5. TEST SETTERS
-        // =====================================
-
-        System.out.println("\n===== TEST SETTERS =====");
-
-        job1.setOwner("etlsvc");
-        job1.setMachine("klx-app03");
-
-        job1.printDescription();
-
-
-        // =====================================
-        // 6. TEST DEPENDENCIES
-        // =====================================
-
-        System.out.println("\n===== DEPENDENCY CHECKS =====");
-
-        System.out.println(
-            "Does " + job2.getName() +
-            " depend on KL_CUS_EXTRACT_01? " +
-            job2.dependsOn("KL_CUS_EXTRACT_01")
+        Chain ordersChain = new Chain(
+            "KL_ORDERS_NIGHTLY",
+            "mon-fri",
+            "01:00",
+            new Job[] {job1, job2, job3, job4, job5}
         );
 
-        System.out.println(
-            "Does " + job3.getName() +
-            " depend on KL_CUS_EXTRACT_01? " +
-            job3.dependsOn("KL_CUS_EXTRACT_01")
+
+        // =====================================
+        // 3. PRINT CHAIN DETAILS
+        // =====================================
+
+        System.out.println("===== CHAIN DETAILS =====");
+
+        System.out.println("Chain: " + ordersChain.getName());
+        System.out.println("Days: " + ordersChain.getDays());
+        System.out.println("Time: " + ordersChain.getTime());
+
+
+        // =====================================
+        // 4. PRINT JOBS IN RUN ORDER
+        // =====================================
+
+        ordersChain.printJobsInRunOrder();
+
+
+        // =====================================
+        // 5. CHECK INVALID DEPENDENCIES
+        // =====================================
+
+        System.out.println("\n===== INVALID DEPENDENCIES =====");
+
+        String[] invalid =
+            ordersChain.findInvalidDependencies();
+
+        if (invalid.length == 0) {
+
+            System.out.println("No invalid dependencies found.");
+
+        } else {
+
+            for (String issue : invalid) {
+
+                System.out.println("Invalid: " + issue);
+            }
+        }
+
+
+        // =====================================
+        // 6. TEST UNUSUAL INPUT: SELF-DEPENDENCY
+        // =====================================
+
+        System.out.println("\n===== SELF-DEPENDENCY TEST =====");
+
+        Job selfJob = new Job(
+            "KL_TEST_SELF",
+            "CMD",
+            "TEST_CHAIN",
+            "batchsvc",
+            "klx-app01",
+            new String[] {"KL_TEST_SELF"}
         );
 
-        System.out.println(
-            "Does " + job4.getName() +
-            " depend on KL_CUS_RECONCILE_05? " +
-            job4.dependsOn("KL_CUS_RECONCILE_05")
+        Chain testChain = new Chain(
+            "TEST_CHAIN",
+            "daily",
+            "02:00",
+            new Job[] {selfJob}
         );
+
+        String[] selfIssues =
+            testChain.findInvalidDependencies();
+
+        for (String issue : selfIssues) {
+
+            System.out.println("Invalid: " + issue);
+        }
+
+
+        // =====================================
+        // 7. TEST UNUSUAL INPUT: EMPTY DEPENDENCIES
+        // =====================================
+
+        System.out.println("\n===== EMPTY DEPENDENCY TEST =====");
+
+        Job emptyJob = new Job(
+            "KL_TEST_EMPTY",
+            "CMD",
+            "TEST_CHAIN",
+            "batchsvc",
+            "klx-app01",
+            new String[] {}
+        );
+
+        Chain emptyChain = new Chain(
+            "EMPTY_CHAIN",
+            "daily",
+            "03:00",
+            new Job[] {emptyJob}
+        );
+
+        String[] emptyIssues =
+            emptyChain.findInvalidDependencies();
+
+        if (emptyIssues.length == 0) {
+
+            System.out.println("No invalid dependencies found.");
+
+        }
+
+
+        // =====================================
+        // 8. TEST UNUSUAL INPUT: UNKNOWN DEPENDENCY
+        // =====================================
+
+        System.out.println("\n===== UNKNOWN DEPENDENCY TEST =====");
+
+        Job unknownJob = new Job(
+            "KL_TEST_UNKNOWN",
+            "CMD",
+            "TEST_CHAIN",
+            "batchsvc",
+            "klx-app01",
+            new String[] {"KL_JOB_DOES_NOT_EXIST"}
+        );
+
+        Chain unknownChain = new Chain(
+            "UNKNOWN_CHAIN",
+            "daily",
+            "04:00",
+            new Job[] {unknownJob}
+        );
+
+        String[] unknownIssues =
+            unknownChain.findInvalidDependencies();
+
+        for (String issue : unknownIssues) {
+
+            System.out.println("Invalid: " + issue);
+        }
 
     }
 }
