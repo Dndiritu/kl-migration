@@ -1,5 +1,5 @@
 
-public abstract class Job {
+public abstract class Job implements Checkable {
 
     private final String name;
     private final String chain;
@@ -20,6 +20,7 @@ public abstract class Job {
         this.dependencies = dependencies.clone();
     }
 
+    // Getters
     public String getName() {
         return name;
     }
@@ -44,10 +45,12 @@ public abstract class Job {
         return dependencies.clone();
     }
 
+    // Abstract methods implemented by subclasses
     public abstract String getType();
 
     public abstract String getTypeSpecificProblem();
 
+    // Shared description method
     public void printDescription() {
         System.out.println("Job: " + name);
         System.out.println("Type: " + getType());
@@ -55,5 +58,16 @@ public abstract class Job {
         System.out.println("Owner: " + owner);
         System.out.println("Machine: " + machine);
         System.out.println("Description: " + description);
+    }
+
+    // Checkable interface implementation
+    @Override
+    public boolean isValid() {
+        return getTypeSpecificProblem() == null;
+    }
+
+    @Override
+    public String getValidationProblem() {
+        return getTypeSpecificProblem();
     }
 }
