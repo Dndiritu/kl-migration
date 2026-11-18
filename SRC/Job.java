@@ -1,37 +1,27 @@
 
-public class Job {
+public abstract class Job {
 
-    // 1. Private fields
     private final String name;
-    private final String type;
     private final String chain;
-
-    private String owner;
-    private String machine;
-
-    // Array holding job dependencies
+    private final String owner;
+    private final String machine;
+    private final String description;
     private final String[] dependencies;
 
-    // 2. Parameterized constructor
-    public Job(String name, String type, String chain,
-               String owner, String machine,
+    public Job(String name, String chain, String owner,
+               String machine, String description,
                String[] dependencies) {
 
         this.name = name;
-        this.type = type;
         this.chain = chain;
         this.owner = owner;
         this.machine = machine;
+        this.description = description;
         this.dependencies = dependencies.clone();
     }
 
-    // 3. Getters
     public String getName() {
         return name;
-    }
-
-    public String getType() {
-        return type;
     }
 
     public String getChain() {
@@ -46,45 +36,24 @@ public class Job {
         return machine;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
     public String[] getDependencies() {
         return dependencies.clone();
     }
 
-    // 4. Setters
-    public void setOwner(String owner) {
-        this.owner = owner;
-    }
+    public abstract String getType();
 
-    public void setMachine(String machine) {
-        this.machine = machine;
-    }
+    public abstract String getTypeSpecificProblem();
 
-    // 5. Print job description
     public void printDescription() {
-        System.out.println(
-            "Job: " + name +
-            " | Type: " + type +
-            " | Chain: " + chain +
-            " | Owner: " + owner +
-            " | Machine: " + machine
-        );
-    }
-
-    // 6. Validate job name
-    public boolean isNameValid() {
-        return name.matches("[A-Z0-9_]+");
-    }
-
-    // 7. Check whether a job depends on another job
-    public boolean dependsOn(String jobName) {
-
-        for (String dependency : dependencies) {
-
-            if (dependency.equals(jobName)) {
-                return true;
-            }
-        }
-
-        return false;
+        System.out.println("Job: " + name);
+        System.out.println("Type: " + getType());
+        System.out.println("Chain: " + chain);
+        System.out.println("Owner: " + owner);
+        System.out.println("Machine: " + machine);
+        System.out.println("Description: " + description);
     }
 }

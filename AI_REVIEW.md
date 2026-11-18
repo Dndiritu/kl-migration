@@ -1,26 +1,50 @@
 
-# AI Review - Job Class
+# AI Review – Job Class Hierarchy
 
-## Suggestions Accepted
+## 1. Shared fields in Job
+- name
+- chain
+- owner
+- machine
+- description
+- dependencies
 
-1. Use final for the five attributes because their values
-   are assigned during construction and should not be reassigned.
+These fields are shared by both CMD and FT jobs.
 
-## Suggestions Deferred
+## 2. CMD-specific field
+- command
 
-1. Add getter methods to expose private attributes.
-   These are not currently required by the assignment.
+CommandJob also validates that a command has been provided.
 
-## Suggestion Rejected
+## 3. FT-specific fields
+- source
+- target
 
-1. Making attributes public.
+FileTransferJob validates that both source and target have been provided.
 
-Reason:
-This would weaken encapsulation. Keeping attributes
-private protects the internal state of the Job object.
+## 4. Hierarchy review
 
-## Conclusion
+The class hierarchy separates shared job properties from
+type-specific properties.
 
-The Job class follows standard Java naming conventions,
-uses encapsulation, and has a constructor and methods
-with clearly defined responsibilities.
+The abstract Job class provides common fields, getters,
+and shared description behaviour.
+
+CommandJob and FileTransferJob extend Job and implement
+their own type identification and validation methods.
+
+## 5. AI suggestion rejected
+
+Suggestion: Move the shared printDescription() method
+into both subclasses.
+
+Reason for rejection: Both job types need to display
+the same common information. Keeping this method in
+the parent class avoids duplicated code and makes
+maintenance easier.
+
+## 6. Conclusion
+
+The current hierarchy is appropriate because it uses
+inheritance to share common behaviour while allowing
+each subclass to handle its own specific requirements.
