@@ -1,32 +1,21 @@
 
-public class Chain {
+import java.util.ArrayList;
+import java.util.List;
 
-    // =====================================
-    // 1. PRIVATE FIELDS
-    // =====================================
+public class Chain {
 
     private final String name;
     private final String days;
     private final String time;
-    private final Job[] jobs;
+    private final List<Job> jobs;
 
-
-    // =====================================
-    // 2. CONSTRUCTOR
-    // =====================================
-
-    public Chain(String name, String days, String time, Job[] jobs) {
+    public Chain(String name, String days, String time, List<Job> jobs) {
 
         this.name = name;
         this.days = days;
         this.time = time;
-        this.jobs = jobs.clone();
+        this.jobs = new ArrayList<>(jobs);
     }
-
-
-    // =====================================
-    // 3. GETTERS
-    // =====================================
 
     public String getName() {
         return name;
@@ -40,42 +29,30 @@ public class Chain {
         return time;
     }
 
-    public Job[] getJobs() {
-        return jobs.clone();
+    public List<Job> getJobs() {
+        return new ArrayList<>(jobs);
     }
-
-
-    // =====================================
-    // 4. PRINT JOBS IN RUN ORDER
-    // =====================================
 
     public void printJobsInRunOrder() {
 
         System.out.println("\n===== CHAIN RUN ORDER =====");
 
-        for (int i = 0; i < jobs.length; i++) {
+        int position = 1;
 
-            System.out.println(
-                (i + 1) + ". " + jobs[i].getName()
-            );
+        for (Job job : jobs) {
+            System.out.println(position + ". " + job.getName());
+            position++;
         }
     }
 
+    public List<String> findInvalidDependencies() {
 
-    // =====================================
-    // 5. CHECK INVALID DEPENDENCIES
-    // =====================================
-
-    public String[] findInvalidDependencies() {
-
-        java.util.ArrayList<String> invalidDependencies =
-            new java.util.ArrayList<>();
+        List<String> invalidDependencies = new ArrayList<>();
 
         for (Job job : jobs) {
 
             for (String dependency : job.getDependencies()) {
 
-                // Check 1: Self-dependency
                 if (dependency.equals(job.getName())) {
 
                     invalidDependencies.add(
@@ -85,13 +62,11 @@ public class Chain {
                     continue;
                 }
 
-                // Check 2: Dependency missing from chain
                 boolean found = false;
 
                 for (Job chainJob : jobs) {
 
                     if (chainJob.getName().equals(dependency)) {
-
                         found = true;
                         break;
                     }
@@ -107,6 +82,6 @@ public class Chain {
             }
         }
 
-        return invalidDependencies.toArray(new String[0]);
+        return invalidDependencies;
     }
 }

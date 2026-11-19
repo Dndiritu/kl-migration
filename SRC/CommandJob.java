@@ -1,11 +1,13 @@
 
+import java.util.List;
+
 public class CommandJob extends Job {
 
     private final String command;
 
     public CommandJob(String name, String chain, String owner,
                       String machine, String description,
-                      String[] dependencies, String command) {
+                      List<String> dependencies, String command) {
 
         super(name, chain, owner, machine, description, dependencies);
         this.command = command;

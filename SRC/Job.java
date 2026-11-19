@@ -1,4 +1,7 @@
 
+import java.util.List;
+import java.util.ArrayList;
+
 public abstract class Job implements Checkable {
 
     private final String name;
@@ -6,18 +9,18 @@ public abstract class Job implements Checkable {
     private final String owner;
     private final String machine;
     private final String description;
-    private final String[] dependencies;
+    private final List<String> dependencies;
 
     public Job(String name, String chain, String owner,
                String machine, String description,
-               String[] dependencies) {
+               List<String> dependencies) {
 
         this.name = name;
         this.chain = chain;
         this.owner = owner;
         this.machine = machine;
         this.description = description;
-        this.dependencies = dependencies.clone();
+        this.dependencies = new ArrayList<>(dependencies);
     }
 
     // Getters
@@ -41,16 +44,14 @@ public abstract class Job implements Checkable {
         return description;
     }
 
-    public String[] getDependencies() {
-        return dependencies.clone();
+    public List<String> getDependencies() {
+        return new ArrayList<>(dependencies);
     }
 
-    // Abstract methods implemented by subclasses
     public abstract String getType();
 
     public abstract String getTypeSpecificProblem();
 
-    // Shared description method
     public void printDescription() {
         System.out.println("Job: " + name);
         System.out.println("Type: " + getType());
@@ -60,7 +61,6 @@ public abstract class Job implements Checkable {
         System.out.println("Description: " + description);
     }
 
-    // Checkable interface implementation
     @Override
     public boolean isValid() {
         return getTypeSpecificProblem() == null;

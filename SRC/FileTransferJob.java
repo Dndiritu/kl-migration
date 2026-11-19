@@ -1,4 +1,6 @@
 
+import java.util.List;
+
 public class FileTransferJob extends Job {
 
     private final String source;
@@ -6,7 +8,7 @@ public class FileTransferJob extends Job {
 
     public FileTransferJob(String name, String chain, String owner,
                            String machine, String description,
-                           String[] dependencies,
+                           List<String> dependencies,
                            String source, String target) {
 
         super(name, chain, owner, machine, description, dependencies);
