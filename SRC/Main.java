@@ -1,136 +1,165 @@
 
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class Main {
 
     public static void main(String[] args) {
 
         try {
-            XMLData data = XMLLoader.load("customer_export.xml");
+            // Load both exports
+            XMLData xmlData =
+                XMLLoader.load("customer_export.xml");
 
-            List<Machine> machines = data.getMachines();
-            List<Chain> chains = data.getChains();
-            List<Job> jobs = data.getJobs();
-            List<Schedule> schedules = data.getSchedules();
+            XMLData jsonData =
+                JsonLoader.load("customer_export.json");
 
-            System.out.println("========== XML IMPORT SUMMARY ==========");
-            System.out.println("Machines: " + machines.size());
-            System.out.println("Chains: " + chains.size());
-            System.out.println("Total jobs: " + jobs.size());
-            System.out.println("Schedules: " + schedules.size());
+            System.out.println("========== XML VS JSON COMPARISON ==========");
 
-            // Duplicate job detection
-            System.out.println("\n========== DUPLICATE JOB NAMES ==========");
+            // Compare total records
+            compare("Machines",
+                xmlData.getMachines().size(),
+                jsonData.getMachines().size());
 
-            Map<String, Integer> nameCounts = new HashMap<>();
+            compare("Chains",
+                xmlData.getChains().size(),
+                jsonData.getChains().size());
 
-            for (Job job : jobs) {
-                nameCounts.merge(job.getName(), 1, Integer::sum);
-            }
+            compare("Total jobs",
+                xmlData.getJobs().size(),
+                jsonData.getJobs().size());
 
-            boolean duplicatesFound = false;
+            compare("Schedules",
+                xmlData.getSchedules().size(),
+                jsonData.getSchedules().size());
 
-            for (Map.Entry<String, Integer> entry : nameCounts.entrySet()) {
-                if (entry.getValue() > 1) {
-                    System.out.println(
-                        entry.getKey() + ": " +
-                        entry.getValue() + " occurrences"
-                    );
-                    duplicatesFound = true;
-                }
-            }
+            // Compare job names, preserving duplicates
+            System.out.println("\n========== JOB NAME COMPARISON ==========");
 
-            if (!duplicatesFound) {
-                System.out.println("No duplicate job names found.");
-            }
+            Map<String, Integer> xmlNames =
+                getJobNameCounts(xmlData.getJobs());
 
-            // Job counts by type
-            int commandCount = 0;
-            int fileTransferCount = 0;
+            Map<String, Integer> jsonNames =
+                getJobNameCounts(jsonData.getJobs());
 
-            for (Job job : jobs) {
-                if (job instanceof CommandJob) {
-                    commandCount++;
-                } else if (job instanceof FileTransferJob) {
-                    fileTransferCount++;
-                }
-            }
+            compareMaps("Job names and occurrences",
+                xmlNames, jsonNames);
 
-            System.out.println("\n========== JOBS BY TYPE ==========");
-            System.out.println("CMD jobs: " + commandCount);
-            System.out.println("FT jobs: " + fileTransferCount);
+            // Compare job types
+            System.out.println("\n========== JOB TYPE COMPARISON ==========");
 
-            // Jobs belonging to each chain
-            System.out.println("\n========== JOBS BY CHAIN ==========");
+            Map<String, Integer> xmlTypes =
+                getJobTypeCounts(xmlData.getJobs());
 
-            for (Chain chain : chains) {
+            Map<String, Integer> jsonTypes =
+                getJobTypeCounts(jsonData.getJobs());
+
+            compareMaps("Job counts by type",
+                xmlTypes, jsonTypes);
+
+            System.out.println("XML: " + xmlTypes);
+            System.out.println("JSON: " + jsonTypes);
+
+            // Compare jobs per chain
+            System.out.println("\n========== JOBS PER CHAIN ==========");
+
+            Map<String, Integer> xmlChains =
+                getChainJobCounts(xmlData.getChains());
+
+            Map<String, Integer> jsonChains =
+                getChainJobCounts(jsonData.getChains());
+
+            compareMaps("Jobs per chain",
+                xmlChains, jsonChains);
+
+            System.out.println("XML: " + xmlChains);
+            System.out.println("JSON: " + jsonChains);
+
+            // Final result
+            System.out.println("\n========== FINAL RESULT ==========");
+
+            boolean allMatch =
+                xmlData.getMachines().size() == jsonData.getMachines().size()
+                && xmlData.getChains().size() == jsonData.getChains().size()
+                && xmlData.getJobs().size() == jsonData.getJobs().size()
+                && xmlData.getSchedules().size() == jsonData.getSchedules().size()
+                && xmlNames.equals(jsonNames)
+                && xmlTypes.equals(jsonTypes)
+                && xmlChains.equals(jsonChains);
+
+            if (allMatch) {
                 System.out.println(
-                    chain.getName() + ": " +
-                    chain.getJobs().size() + " jobs"
+                    "SUCCESS: XML and JSON loaders produced matching results."
+                );
+            } else {
+                System.out.println(
+                    "WARNING: Differences found between XML and JSON loaders."
                 );
             }
 
-            // Identify standalone and unknown-chain jobs
-            Set<String> definedChains = new HashSet<>();
-
-            for (Chain chain : chains) {
-                definedChains.add(chain.getName());
-            }
-
-            int unassigned = 0;
-            int unknownChain = 0;
-
-            for (Job job : jobs) {
-                if (job.getChain() == null ||
-                    job.getChain().isBlank()) {
-                    unassigned++;
-                } else if (!definedChains.contains(job.getChain())) {
-                    unknownChain++;
-                }
-            }
-
-            System.out.println("\n========== UNGROUPED JOBS ==========");
-            System.out.println("Jobs without a chain: " + unassigned);
-            System.out.println(
-                "Jobs referencing unknown chains: " + unknownChain
-            );
-
-            // Schedule validation
-            System.out.println("\n========== SCHEDULE VALIDATION ==========");
-
-            int validSchedules = 0;
-            int invalidSchedules = 0;
-
-            for (Schedule schedule : schedules) {
-
-                System.out.println("\nChecking: " + schedule.getName());
-
-                if (schedule.isValid()) {
-                    validSchedules++;
-                    System.out.println("Status: VALID");
-                } else {
-                    invalidSchedules++;
-                    System.out.println(
-                        "Status: INVALID - " +
-                        schedule.getValidationProblem()
-                    );
-                }
-            }
-
-            System.out.println("\n========== SCHEDULE SUMMARY ==========");
-            System.out.println("Valid schedules: " + validSchedules);
-            System.out.println("Invalid schedules: " + invalidSchedules);
-
-            System.out.println("\n========== IMPORT COMPLETE ==========");
-
         } catch (XMLLoaderException e) {
-            System.out.println(
-                "XML IMPORT FAILED: " + e.getMessage()
-            );
+            System.out.println("IMPORT FAILED: " + e.getMessage());
         }
+    }
+
+    private static void compare(
+            String label, int xmlCount, int jsonCount) {
+
+        String status = xmlCount == jsonCount ? "MATCH" : "MISMATCH";
+
+        System.out.println(
+            label + " | XML: " + xmlCount +
+            " | JSON: " + jsonCount +
+            " | " + status
+        );
+    }
+
+    private static void compareMaps(
+            String label,
+            Map<String, Integer> xml,
+            Map<String, Integer> json) {
+
+        System.out.println(
+            label + ": " +
+            (xml.equals(json) ? "MATCH" : "MISMATCH")
+        );
+    }
+
+    private static Map<String, Integer> getJobNameCounts(
+            List<Job> jobs) {
+
+        Map<String, Integer> counts = new HashMap<>();
+
+        for (Job job : jobs) {
+            counts.merge(job.getName(), 1, Integer::sum);
+        }
+
+        return counts;
+    }
+
+    private static Map<String, Integer> getJobTypeCounts(
+            List<Job> jobs) {
+
+        Map<String, Integer> counts = new HashMap<>();
+
+        for (Job job : jobs) {
+            counts.merge(job.getType(), 1, Integer::sum);
+        }
+
+        return counts;
+    }
+
+    private static Map<String, Integer> getChainJobCounts(
+            List<Chain> chains) {
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+
+        for (Chain chain : chains) {
+            counts.put(chain.getName(), chain.getJobs().size());
+        }
+
+        return counts;
     }
 }
