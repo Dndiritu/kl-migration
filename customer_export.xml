@@ -1,0 +1,820 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export system="LegacySched" customer="Kestrel Logistics" exportVersion="1">
+  <machines>
+    <machine name="klx-app01" os="linux"/>
+    <machine name="klx-app02" os="linux"/>
+    <machine name="klx-db01" os="linux"/>
+    <machine name="kwin-fs01" os="windows"/>
+    <machine name="kwin-rpt01" os="windows"/>
+  </machines>
+  <chains>
+    <chain name="KL_ORDERS_NIGHTLY">
+      <schedule days="mon-fri" time="01:00"/>
+    </chain>
+    <chain name="KL_INVENTORY_SYNC">
+      <schedule days="daily" time="02:30"/>
+    </chain>
+    <chain name="KL_SHIPMENTS_DAILY">
+      <schedule days="mon-sat" time="04:00"/>
+    </chain>
+    <chain name="KL_FINANCE_CLOSE">
+      <schedule days="mon-fri" time="22:00"/>
+    </chain>
+    <chain name="KL_CUSTOMER_FEEDS">
+      <schedule days="daily" time="05:30"/>
+    </chain>
+    <chain name="KL_WAREHOUSE_ETL">
+      <schedule days="mon-fri" time="03:00"/>
+    </chain>
+    <chain name="KL_REPORTING_WEEKLY">
+      <schedule days="sun" time="06:00"/>
+    </chain>
+    <chain name="KL_PAYROLL_PREP">
+      <schedule days="fri" time="20:00"/>
+    </chain>
+    <chain name="KL_SUPPLIER_EDI">
+      <schedule days="daily" time="00:30"/>
+    </chain>
+    <chain name="KL_ARCHIVE_PURGE">
+      <schedule days="sat" time="23:00"/>
+    </chain>
+  </chains>
+  <jobs>
+    <job name="KL_ORD_EXTRACT_01" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="finsvc" machine="klx-app01">
+      <description>Extract step 1 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/extract_01.sh</command>
+    </job>
+    <job name="kl orders validate 02" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="batchsvc" machine="klx-app02">
+      <description>Validate step 2 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/validate_02.sh</command>
+      <dependsOn condition="success">KL_ORD_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_ORD_TRANSFORM_03" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="batchsvc" machine="klx-app01">
+      <description>Transform step 3 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/transform_03.sh</command>
+      <dependsOn condition="success">kl orders validate 02</dependsOn>
+    </job>
+    <job name="KL_ORD_LOAD_04" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="batchsvc" machine="klx-db01">
+      <description>Load step 4 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/load_04.sh</command>
+      <dependsOn condition="success">KL_ORD_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_ORD_RECONCILE_05" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="finsvc" machine="klx-db01">
+      <description>Reconcile step 5 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/reconcile_05.sh</command>
+      <dependsOn condition="success">KL_ORD_TRANSFORM_3</dependsOn>
+    </job>
+    <job name="KL_ORD_NOTIFY_06" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="batchsvc" machine="klx-db01">
+      <description>Notify step 6 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/notify_06.sh</command>
+      <dependsOn condition="success">KL_ORD_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_ORD_TRANSFER_07" type="FT" chain="KL_ORDERS_NIGHTLY" owner="finsvc" machine="klx-app01">
+      <description>Transfer step 7 for KL_ORDERS_NIGHTLY</description>
+      <source>/data/ord/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\ord\transfer_07.csv</target>
+      <dependsOn condition="success">KL_ORD_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_ORD_REPORT_08" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="finsvc" machine="klx-db01">
+      <description>Report step 8 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/legacy/filter_failed_orders.sh orders.csv failed_orders.csv</command>
+      <dependsOn condition="success">KL_ORD_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_ORD_CLEANUP_09" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="etlsvc" machine="klx-db01">
+      <description>Cleanup step 9 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/cleanup_09.sh</command>
+      <dependsOn condition="success">KL_ORD_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_ORD_BACKUP_10" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="etlsvc" machine="klx-app03">
+      <description>Backup step 10 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/backup_10.sh</command>
+      <dependsOn condition="success">KL_ORD_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_ORD_AGGREGATE_11" type="CMD" chain="KL_ORDERS_NIGHTLY" owner="etlsvc" machine="klx-db01">
+      <description>Aggregate step 11 for KL_ORDERS_NIGHTLY</description>
+      <command>/opt/kl/ord/aggregate_11.sh</command>
+      <dependsOn condition="success">KL_ORD_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_ORD_EXPORT_12" type="FT" chain="KL_ORDERS_NIGHTLY" owner="batchsvc" machine="klx-app01">
+      <description>Export step 12 for KL_ORDERS_NIGHTLY</description>
+      <source>/data/ord/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\ord\export_12.csv</target>
+      <dependsOn condition="success">KL_ORD_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_ORD_IMPORT_13" type="FT" chain="KL_ORDERS_NIGHTLY" owner="batchsvc" machine="kwin-fs01">
+      <description>Import step 13 for KL_ORDERS_NIGHTLY</description>
+      <source>/data/ord/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\ord\import_13.csv</target>
+      <dependsOn condition="success">KL_ORD_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_INV_EXTRACT_01" type="CMD" chain="KL_INVENTORY_SYNC" owner="batchsvc" machine="klx-db01">
+      <description>Extract step 1 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/extract_01.sh</command>
+    </job>
+    <job name="KL_INV_VALIDATE_02" type="CMD" chain="KL_INVENTORY_SYNC" owner="batchsvc" machine="klx-app02">
+      <description>Validate step 2 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/validate_02.sh</command>
+      <dependsOn condition="success">KL_INV_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_INV_TRANSFORM_03" type="CMD" chain="KL_INVENTORY_SYNC" owner="" machine="klx-db01">
+      <description>Transform step 3 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/transform_03.sh</command>
+      <dependsOn condition="success">KL_INV_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_INV_LOAD_04" type="CMD" chain="KL_INVENTORY_SYNC" owner="finsvc" machine="klx-db01">
+      <description>Load step 4 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/load_04.sh</command>
+      <dependsOn condition="success">KL_INV_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_INV_RECONCILE_05" type="CMD" chain="KL_INVENTORY_SYNC" owner="finsvc" machine="klx-app02">
+      <description>Reconcile step 5 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/reconcile_05.sh</command>
+      <dependsOn condition="success">KL_INV_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_INV_NOTIFY_06" type="CMD" chain="KL_INVENTORY_SYNC" owner="finsvc" machine="klx-app01">
+      <description>Notify step 6 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/notify_06.sh</command>
+      <dependsOn condition="failure">KL_INV_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_INV_TRANSFER_07" type="FT" chain="KL_INVENTORY_SYNC" owner="etlsvc" machine="klx-app02">
+      <description>Transfer step 7 for KL_INVENTORY_SYNC</description>
+      <source>/data/inv/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\inv\transfer_07.csv</target>
+      <dependsOn condition="success">KL_INV_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_INV_REPORT_08" type="CMD" chain="KL_INVENTORY_SYNC" owner="etlsvc" machine="klx-app02">
+      <description>Report step 8 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/report_08.sh</command>
+      <dependsOn condition="success">KL_INV_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_INV_CLEANUP_09" type="CMD" chain="KL_INVENTORY_SYNC" owner="etlsvc" machine="klx-db01">
+      <description>Cleanup step 9 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/cleanup_09.sh</command>
+      <dependsOn condition="success">KL_INV_RECONCILE_05X</dependsOn>
+    </job>
+    <job name="KL_INV_BACKUP_10" type="CMD" chain="KL_INVENTORY_SYNC" owner="etlsvc" machine="klx-app01">
+      <description>Backup step 10 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/backup_10.sh</command>
+      <dependsOn condition="success">KL_INV_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_INV_AGGREGATE_11" type="CMD" chain="KL_INVENTORY_SYNC" owner="batchsvc" machine="klx-app02">
+      <description>Aggregate step 11 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/aggregate_11.sh</command>
+      <dependsOn condition="success">KL_INV_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_INV_EXPORT_12" type="FT" chain="KL_INVENTORY_SYNC" owner="batchsvc" machine="klx-app02">
+      <description>Export step 12 for KL_INVENTORY_SYNC</description>
+      <source>/data/inv/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\inv\export_12.csv</target>
+      <dependsOn condition="success">KL_INV_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_INV_IMPORT_13" type="FT" chain="KL_INVENTORY_SYNC" owner="batchsvc" machine="kwin-rpt01">
+      <description>Import step 13 for KL_INVENTORY_SYNC</description>
+      <source>/data/inv/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\inv\import_13.csv</target>
+      <dependsOn condition="success">KL_INV_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_INV_CHECK_14" type="CMD" chain="KL_INVENTORY_SYNC" owner="batchsvc" machine="klx-app01">
+      <description>Check step 14 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/check_14.sh</command>
+      <dependsOn condition="success">KL_INV_IMPORT_13</dependsOn>
+    </job>
+    <job name="KL_INV_SUMMARY_15" type="CMD" chain="KL_INVENTORY_SYNC" owner="etlsvc" machine="klx-app02">
+      <description>Summary step 15 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/summary_15.sh</command>
+      <dependsOn condition="success">KL_INV_CHECK_14</dependsOn>
+    </job>
+    <job name="KL_INV_EXTRACT_16" type="CMD" chain="KL_INVENTORY_SYNC" owner="batchsvc" machine="klx-app02">
+      <description>Extract step 16 for KL_INVENTORY_SYNC</description>
+      <command>/opt/kl/inv/extract_16.sh</command>
+      <dependsOn condition="success">KL_INV_SUMMARY_15</dependsOn>
+    </job>
+    <job name="KL_SHP_EXTRACT_01" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="finsvc" machine="klx-db01">
+      <description>Extract step 1 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/extract_01.sh</command>
+    </job>
+    <job name="KL_SHP_VALIDATE_02" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="batchsvc" machine="klx-app02">
+      <description>Validate step 2 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/validate_02.sh</command>
+      <dependsOn condition="success">KL_SHP_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_SHP_TRANSFORM_03" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="etlsvc" machine="klx-db01">
+      <description>Transform step 3 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/transform_03.sh</command>
+      <dependsOn condition="success">KL_SHP_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL-SHP-LOAD-04" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="finsvc" machine="klx-app02">
+      <description>Load step 4 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/load_04.sh</command>
+      <dependsOn condition="success">KL_SHP_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_SHP_RECONCILE_05" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="batchsvc" machine="klx-app02">
+      <description>Reconcile step 5 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/reconcile_05.sh</command>
+      <dependsOn condition="success">KL-SHP-LOAD-04</dependsOn>
+    </job>
+    <job name="KL_SHP_NOTIFY_06" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="batchsvc" machine="klx-app02">
+      <description>Notify step 6 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/notify_06.sh</command>
+      <dependsOn condition="failure">KL_SHP_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_SHP_TRANSFER_07" type="FT" chain="KL_SHIPMENTS_DAILY" owner="etlsvc" machine="klx-app02">
+      <description>Transfer step 7 for KL_SHIPMENTS_DAILY</description>
+      <source>/data/shp/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\shp\transfer_07.csv</target>
+      <dependsOn condition="success">KL_SHP_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_SHP_REPORT_08" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="batchsvc" machine="klx-app01">
+      <description>Report step 8 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/legacy/shipment_status_summary.sh shipments.csv shipment_summary.csv</command>
+      <dependsOn condition="success">KL_SHP_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_SHP_CLEANUP_09" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="etlsvc" machine="klx-db01">
+      <description>Cleanup step 9 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/cleanup_09.sh</command>
+      <dependsOn condition="success">KL_SHP_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_SHP_BACKUP_10" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="batchsvc" machine="klx-app01">
+      <description>Backup step 10 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/backup_10.sh</command>
+      <dependsOn condition="success">KL_SHP_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_SHP_BACKUP_10" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="batchsvc" machine="klx-app01">
+      <description>Backup step 10 for KL_SHIPMENTS_DAILY (copy)</description>
+      <command>/opt/kl/shp/backup_10.sh</command>
+    </job>
+    <job name="KL_SHP_AGGREGATE_11" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="batchsvc" machine="klx-app01">
+      <description>Aggregate step 11 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/aggregate_11.sh</command>
+      <dependsOn condition="success">KL_SHP_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_SHP_EXPORT_12" type="FT" chain="KL_SHIPMENTS_DAILY" owner="finsvc" machine="kwin-rpt01">
+      <description>Export step 12 for KL_SHIPMENTS_DAILY</description>
+      <source>/data/shp/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\shp\export_12.csv</target>
+      <dependsOn condition="success">KL_SHP_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_SHP_IMPORT_13" type="FT" chain="KL_SHIPMENTS_DAILY" owner="etlsvc" machine="kwin-rpt01">
+      <description>Import step 13 for KL_SHIPMENTS_DAILY</description>
+      <source>/data/shp/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\shp\import_13.csv</target>
+      <dependsOn condition="success">KL_SHP_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_SHP_CHECK_14" type="CMD" chain="KL_SHIPMENTS_DAILY" owner="etlsvc" machine="klx-db01">
+      <description>Check step 14 for KL_SHIPMENTS_DAILY</description>
+      <command>/opt/kl/shp/check_14.sh</command>
+      <dependsOn condition="success">KL_SHP_IMPORT_13</dependsOn>
+    </job>
+    <job name="KL_FIN_EXTRACT_01" type="CMD" chain="KL_FINANCE_CLOSE" owner="etlsvc" machine="klx-app02">
+      <description>Extract step 1 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/extract_01.sh</command>
+      <parameter name="REGION" value="EU"/>
+    </job>
+    <job name="KL_FIN_VALIDATE_02" type="CMD" chain="KL_FINANCE_CLOSE" owner="etlsvc" machine="klx-app01">
+      <description>Validate step 2 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/validate_02.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_FIN_TRANSFORM_03" type="CMD" chain="KL_FINANCE_CLOSE" owner="finsvc" machine="klx-app01">
+      <description>Transform step 3 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/transform_03.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_FIN_LOAD_04" type="CMD" chain="KL_FINANCE_CLOSE" owner="etlsvc" machine="klx-db01">
+      <description>Load step 4 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/load_04.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="Kl_Fin_Reconcile_05" type="CMD" chain="KL_FINANCE_CLOSE" owner="batchsvc" machine="klx-db01">
+      <description>Reconcile step 5 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/reconcile_05.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_FIN_NOTIFY_06" type="CMD" chain="KL_FINANCE_CLOSE" owner="batchsvc" machine="klx-db01">
+      <description>Notify step 6 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/notify_06.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">Kl_Fin_Reconcile_05</dependsOn>
+    </job>
+    <job name="KL_FIN_TRANSFER_07" type="FT" chain="KL_FINANCE_CLOSE" owner="finsvc" machine="klx-app01">
+      <description>Transfer step 7 for KL_FINANCE_CLOSE</description>
+      <source>/data/fin/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\fin\transfer_07.csv</target>
+      <dependsOn condition="success">KL_FIN_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_FIN_REPORT_08" type="CMD" chain="KL_FINANCE_CLOSE" owner="batchsvc" machine="klx-db01">
+      <description>Report step 8 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/report_08.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_FIN_CLEANUP_09" type="CMD" chain="KL_FINANCE_CLOSE" owner="etlsvc" machine="klx-db01">
+      <description>Cleanup step 9 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/cleanup_09.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_FIN_BACKUP_10" type="CMD" chain="KL_FINANCE_CLOSE" owner="batchsvc" machine="klx-app02">
+      <description>Backup step 10 for KL_FINANCE_CLOSE</description>
+      <command/>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_FIN_AGGREGATE_11" type="CMD" chain="KL_FINANCE_CLOSE" owner="etlsvc" machine="klx-app01">
+      <description>Aggregate step 11 for KL_FINANCE_CLOSE</description>
+      <command>/opt/kl/fin/aggregate_11.sh</command>
+      <parameter name="REGION" value="EU"/>
+      <dependsOn condition="success">KL_FIN_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_FIN_EXPORT_12" type="FT" chain="KL_FINANCE_CLOSE" owner="batchsvc" machine="klx-app01">
+      <description>Export step 12 for KL_FINANCE_CLOSE</description>
+      <source>/data/fin/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\fin\export_12.csv</target>
+      <dependsOn condition="success">KL_FIN_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_FIN_IMPORT_13" type="FT" chain="KL_FINANCE_CLOSE" owner="finsvc" machine="kwin-rpt01">
+      <description>Import step 13 for KL_FINANCE_CLOSE</description>
+      <source>/data/fin/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\fin\import_13.csv</target>
+      <dependsOn condition="success">KL_FIN_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_CUS_EXTRACT_01" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="finsvc" machine="klx-app02">
+      <description>Extract step 1 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/extract_01.sh</command>
+    </job>
+    <job name="KL_CUS_VALIDATE_02" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="etlsvc" machine="klx-db01">
+      <description>Validate step 2 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/validate_02.sh</command>
+      <dependsOn condition="success">KL_CUS_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_CUS_TRANSFORM_03" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="finsvc" machine="klx-app01">
+      <description>Transform step 3 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/transform_03.sh</command>
+      <dependsOn condition="success">KL_CUS_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_CUS_LOAD_04" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="finsvc" machine="klx-db01">
+      <description>Load step 4 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/load_04.sh</command>
+      <dependsOn condition="success">KL_CUS_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_CUS_RECONCILE_05" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="finsvc" machine="klx-app01">
+      <description>Reconcile step 5 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/reconcile_05.sh</command>
+      <dependsOn condition="success">KL_CUS_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_CUS_NOTIFY_06!" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="etlsvc" machine="klx-app02">
+      <description>Notify step 6 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/notify_06.sh</command>
+      <dependsOn condition="success">KL_CUS_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_CUS_TRANSFER_07" type="FT" chain="KL_CUSTOMER_FEEDS" owner="batchsvc" machine="klx-app01">
+      <description>Transfer step 7 for KL_CUSTOMER_FEEDS</description>
+      <source>/data/cus/out/transfer_07.csv</source>
+      <target/>
+      <dependsOn condition="success">KL_CUS_NOTIFY_06!</dependsOn>
+    </job>
+    <job name="KL_CUS_REPORT_08" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="batchsvc" machine="klx-app02">
+      <description>Report step 8 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/report_08.sh</command>
+      <dependsOn condition="success">KL_CUS_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_CUS_CLEANUP_09" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="finsvc" machine="klx-db01">
+      <description>Cleanup step 9 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/cleanup_09.sh</command>
+      <dependsOn condition="success">KL_CUS_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_CUS_BACKUP_10" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="finsvc" machine="klx-app01">
+      <description>Backup step 10 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/backup_10.sh</command>
+      <dependsOn condition="success">KL_CUS_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_CUS_AGGREGATE_11" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="batchsvc" machine="kwin-fs1">
+      <description>Aggregate step 11 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/aggregate_11.sh</command>
+      <dependsOn condition="success">KL_CUS_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_CUS_EXPORT_12" type="FT" chain="KL_CUSTOMER_FEEDS" owner="finsvc" machine="klx-app02">
+      <description>Export step 12 for KL_CUSTOMER_FEEDS</description>
+      <source>/data/cus/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\cus\export_12.csv</target>
+      <dependsOn condition="success">KL_CUS_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_CUS_IMPORT_13" type="FT" chain="KL_CUSTOMER_FEEDS" owner="batchsvc" machine="kwin-fs01">
+      <description>Import step 13 for KL_CUSTOMER_FEEDS</description>
+      <source>/data/cus/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\cus\import_13.csv</target>
+      <dependsOn condition="success">KL_CUS_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_CUS_CHECK_14" type="CMD" chain="KL_CUSTOMER_FEEDS" owner="etlsvc" machine="klx-app02">
+      <description>Check step 14 for KL_CUSTOMER_FEEDS</description>
+      <command>/opt/kl/cus/check_14.sh</command>
+      <dependsOn condition="success">KL_CUS_IMPORT_13</dependsOn>
+    </job>
+    <job name="KL_WHS_EXTRACT_01" type="CMD" chain="KL_WAREHOUSE_ETL" owner="batchsvc" machine="klx-app01">
+      <description>Extract step 1 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/extract_01.sh</command>
+    </job>
+    <job name="KL_WHS_VALIDATE_02" type="CMD" chain="KL_WAREHOUSE_ETL" owner="etlsvc" machine="klx-db01">
+      <description>Validate step 2 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/validate_02.sh</command>
+      <dependsOn condition="success">KL_WHS_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_WHS_TRANSFORM_03" type="CMD" chain="KL_WAREHOUSE_ETL" owner="etlsvc" machine="klx-app02">
+      <description>Transform step 3 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/transform_03.sh</command>
+      <dependsOn condition="success">KL_WHS_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_WHS_LOAD_04" type="CMD" chain="KL_WAREHOUSE_ETL" owner="etlsvc" machine="klx-app02">
+      <description>Load step 4 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/load_04.sh</command>
+      <dependsOn condition="success">KL_WHS_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_WHS_RECONCILE_05" type="CMD" chain="KL_WAREHOUSE_ETL" owner="batchsvc" machine="klx-db01">
+      <description>Reconcile step 5 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/reconcile_05.sh</command>
+      <dependsOn condition="success">KL_WHS_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_WHS_NOTIFY_06" type="CMD" chain="KL_WAREHOUSE_ETL" owner="finsvc" machine="klx-db01">
+      <description>Notify step 6 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/notify_06.sh</command>
+      <dependsOn condition="failure">KL_WHS_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_WHS_TRANSFER_07" type="FT" chain="KL_WAREHOUSE_ETL" owner="" machine="klx-app01">
+      <description>Transfer step 7 for KL_WAREHOUSE_ETL</description>
+      <source>/data/whs/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\whs\transfer_07.csv</target>
+      <dependsOn condition="success">KL_WHS_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_WHS_REPORT_08" type="CMD" chain="KL_WAREHOUSE_ETL" owner="finsvc" machine="klx-app01">
+      <description>Report step 8 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/report_08.sh</command>
+      <dependsOn condition="success">KL_WHS_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_WHS_CLEANUP_09" type="CMD" chain="KL_WAREHOUSE_ETL" owner="batchsvc" machine="klx-app02">
+      <description>Cleanup step 9 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/cleanup_09.sh</command>
+      <dependsOn condition="success">KL_WHS_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_WHS_BACKUP_10" type="CMD" chain="KL_WAREHOUSE_ETL" owner="batchsvc" machine="klx-app02">
+      <description>Backup step 10 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/backup_10.sh</command>
+      <dependsOn condition="success">KL_WHS_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_WHS_AGGREGATE_11" type="CMD" chain="KL_WAREHOUSE_ETL" owner="etlsvc" machine="klx-app02">
+      <description>Aggregate step 11 for KL_WAREHOUSE_ETL</description>
+      <command>/opt/kl/whs/aggregate_11.sh</command>
+      <dependsOn condition="success">KL_WHS_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_WHS_EXPORT_12" type="FT" chain="KL_WAREHOUSE_ELT" owner="finsvc" machine="klx-app02">
+      <description>Export step 12 for KL_WAREHOUSE_ETL</description>
+      <source>/data/whs/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\whs\export_12.csv</target>
+      <dependsOn condition="success">KL_WHS_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_WHS_IMPORT_13" type="FT" chain="KL_WAREHOUSE_ETL" owner="etlsvc" machine="klx-app01">
+      <description>Import step 13 for KL_WAREHOUSE_ETL</description>
+      <source>/data/whs/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\whs\import_13.csv</target>
+      <dependsOn condition="success">KL_WHS_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_WHS_CHECK_14" type="CMD" chain="KL_WAREHOUSE_ETL" owner="etlsvc" machine="klx-app02">
+      <description>Check step 14 for KL_WAREHOUSE_ETL</description>
+      <command/>
+      <dependsOn condition="success">KL_WHS_IMPORT_13</dependsOn>
+    </job>
+    <job name="KL_RPT_EXTRACT_01" type="CMD" chain="KL_REPORTING_WEEKLY" owner="batchsvc" machine="klx-app02">
+      <description>Extract step 1 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/extract_01.sh</command>
+    </job>
+    <job name="KL_RPT_VALIDATE_02" type="CMD" chain="KL_REPORTING_WEEKLY" owner="etlsvc" machine="klx-app01">
+      <description>Validate step 2 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/validate_02.sh</command>
+      <dependsOn condition="success">KL_RPT_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_RPT_TRANSFORM_03" type="CMD" chain="KL_REPORTING_WEEKLY" owner="etlsvc" machine="klx-app01">
+      <description>Transform step 3 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/transform_03.sh</command>
+      <dependsOn condition="success">KL_RPT_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_RPT_LOAD_04" type="CMD" chain="KL_REPORTING_WEEKLY" owner="etlsvc" machine="klx-app02">
+      <description>Load step 4 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/load_04.sh</command>
+      <dependsOn condition="success">KL_RPT_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_RPT_RECONCILE_05" type="CMD" chain="KL_REPORTING_WEEKLY" owner="etlsvc" machine="klx-app02">
+      <description>Reconcile step 5 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/reconcile_05.sh</command>
+      <dependsOn condition="success">KL_RPT_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_RPT_NOTIFY_06" type="CMD" chain="KL_REPORTING_WEEKLY" owner="finsvc" machine="klx-db01">
+      <description>Notify step 6 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/notify_06.sh</command>
+      <dependsOn condition="success">KL_RPT_AGGREGATE_99</dependsOn>
+    </job>
+    <job name="KL_RPT_TRANSFER_07" type="FT" chain="KL_REPORTING_WEEKLY" owner="finsvc" machine="klx-app01">
+      <description>Transfer step 7 for KL_REPORTING_WEEKLY</description>
+      <source>/data/rpt/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\rpt\transfer_07.csv</target>
+      <dependsOn condition="success">KL_RPT_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_RPT_REPORT_08" type="CMD" chain="KL_REPORTING_WEEKLY" owner="finsvc" machine="klx-db01">
+      <description>Report step 8 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/report_08.sh</command>
+      <dependsOn condition="success">KL_RPT_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_RPT_CLEANUP_09" type="CMD" chain="KL_REPORTING_WEEKLY" owner="finsvc" machine="klx-app01">
+      <description>Cleanup step 9 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/cleanup_09.sh</command>
+      <dependsOn condition="success">KL_RPT_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_RPT_BACKUP_10" type="CMD" chain="KL_REPORTING_WEEKLY" owner="batchsvc" machine="klx-app02">
+      <description>Backup step 10 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/backup_10.sh</command>
+      <dependsOn condition="success">KL_RPT_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_RPT_AGGREGATE_11" type="CMD" chain="KL_REPORTING_WEEKLY" owner="finsvc" machine="klx-app01">
+      <description>Aggregate step 11 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/aggregate_11.sh</command>
+      <dependsOn condition="success">KL_RPT_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_RPT_EXPORT_12" type="FT" chain="KL_REPORTING_WEEKLY" owner="batchsvc" machine="klx-app02">
+      <description>Export step 12 for KL_REPORTING_WEEKLY</description>
+      <source>/data/rpt/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\rpt\export_12.csv</target>
+      <dependsOn condition="success">KL_RPT_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_RPT_IMPORT_13" type="FT" chain="KL_REPORTING_WEEKLY" owner="finsvc" machine="klx-app01">
+      <description>Import step 13 for KL_REPORTING_WEEKLY</description>
+      <source>/data/rpt/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\rpt\import_13.csv</target>
+      <dependsOn condition="success">KL_RPT_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_RPT_CHECK_14" type="CMD" chain="KL_REPORTING_WEEKLY" owner="batchsvc" machine="klx-db01">
+      <description>Check step 14 for KL_REPORTING_WEEKLY</description>
+      <command>/opt/kl/rpt/check_14.sh</command>
+      <dependsOn condition="success">KL_RPT_IMPORT_13</dependsOn>
+    </job>
+    <job name="KL_PAY_EXTRACT_01" type="CMD" chain="KL_PAYROLL_PREP" owner="finsvc" machine="klx-app02">
+      <description>Extract step 1 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/extract_01.sh</command>
+    </job>
+    <job name="KL_PAY_VALIDATE_02" type="CMD" chain="KL_PAYROLL_PREP" owner="finsvc" machine="klx-db01">
+      <description>Validate step 2 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/validate_02.sh</command>
+      <dependsOn condition="success">KL_PAY_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_PAY_TRANSFORM_03" type="CMD" chain="KL_PAYROLL_PREP" owner="etlsvc" machine="klx-db01">
+      <description>Transform step 3 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/transform_03.sh</command>
+      <dependsOn condition="success">KL_PAY_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_PAY_LOAD_04" type="CMD" chain="KL_PAYROLL_PREP" owner="batchsvc" machine="klx-app02">
+      <description>Load step 4 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/load_04.sh</command>
+      <dependsOn condition="success">KL_PAY_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_PAY_RECONCILE_05" type="CMD" chain="KL_PAYROLL_PREP" owner="finsvc" machine="klx-db01">
+      <description>Reconcile step 5 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/reconcile_05.sh</command>
+      <dependsOn condition="success">KL_PAY_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_PAY_NOTIFY_06" type="CMD" chain="KL_PAYROLL_PREP" owner="batchsvc" machine="klx-app02">
+      <description>Notify step 6 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/notify_06.sh</command>
+      <dependsOn condition="failure">KL_PAY_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_PAY_TRANSFER_07" type="FT" chain="KL_PAYROLL_PREP" owner="batchsvc" machine="klx-db01">
+      <description>Transfer step 7 for KL_PAYROLL_PREP</description>
+      <source>/data/pay/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\pay\transfer_07.csv</target>
+      <dependsOn condition="success">KL_PAY_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_PAY_REPORT_08" type="CMD" chain="KL_PAYROLL_PREP" owner="finsvc" machine="klx-app02">
+      <description>Report step 8 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/report_08.sh</command>
+      <dependsOn condition="success">KL_PAY_LOADD_04</dependsOn>
+    </job>
+    <job name="KL_PAY_CLEANUP_09" type="CMD" chain="KL_PAYROLL_PREP" owner="batchsvc" machine="klx-db01">
+      <description>Cleanup step 9 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/cleanup_09.sh</command>
+      <dependsOn condition="success">KL_PAY_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_PAY_BACKUP_10" type="CMD" chain="KL_PAYROLL_PREP" owner="finsvc" machine="klx-app01">
+      <description>Backup step 10 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/backup_10.sh</command>
+      <dependsOn condition="success">KL_PAY_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_PAY_AGGREGATE_11" type="CMD" chain="KL_PAYROLL" owner="finsvc" machine="klx-app01">
+      <description>Aggregate step 11 for KL_PAYROLL_PREP</description>
+      <command>/opt/kl/pay/aggregate_11.sh</command>
+      <dependsOn condition="success">KL_PAY_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_PAY_EXPORT_12" type="FT" chain="KL_PAYROLL_PREP" owner="etlsvc" machine="klx-app02">
+      <description>Export step 12 for KL_PAYROLL_PREP</description>
+      <source>/data/pay/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\pay\export_12.csv</target>
+      <dependsOn condition="success">KL_PAY_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_PAY_IMPORT_13" type="FT" chain="KL_PAYROLL_PREP" owner="finsvc" machine="klx-app01">
+      <description>Import step 13 for KL_PAYROLL_PREP</description>
+      <source>/data/pay/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\pay\import_13.csv</target>
+      <dependsOn condition="success">KL_PAY_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_EDI_EXTRACT_01" type="CMD" chain="KL_SUPPLIER_EDI" owner="batchsvc" machine="klx-db01">
+      <description>Extract step 1 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/extract_01.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+    </job>
+    <job name="KL_EDI_VALIDATE_02" type="CMD" chain="KL_SUPPLIER_EDI" owner="etlsvc" machine="klx-app01">
+      <description>Validate step 2 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/legacy/validate_csv_columns.sh orders.csv 5</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_EDI_TRANSFORM_03" type="CMD" chain="KL_SUPPLIER_EDI" owner="batchsvc" machine="klx-app01">
+      <description>Transform step 3 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/transform_03.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_EDI_LOAD_04" type="CMD" chain="KL_SUPPLIER_EDI" owner="" machine="klx-db01">
+      <description>Load step 4 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/load_04.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_EDI_RECONCILE_05" type="CMD" chain="KL_SUPPLIER_EDI" owner="etlsvc" machine="klx-app01">
+      <description>Reconcile step 5 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/reconcile_05.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_EDI_NOTIFY_06" type="CMD" chain="KL_SUPPLIER_EDI" owner="finsvc" machine="klx-app02">
+      <description>Notify step 6 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/notify_06.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_EDI_TRANSFER_07" type="FT" chain="KL_SUPPLIER_EDI" owner="batchsvc" machine="klx-db01">
+      <description>Transfer step 7 for KL_SUPPLIER_EDI</description>
+      <source>/data/edi/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\edi\transfer_07.csv</target>
+      <dependsOn condition="success">KL_EDI_NOTIFY_06</dependsOn>
+    </job>
+    <job name="KL_EDI_REPORT_08" type="CMD" chain="KL_SUPPLIER_EDI" owner="finsvc" machine="klx-app01">
+      <description>Report step 8 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/report_08.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_EDI_CLEANUP_09" type="CMD" chain="KL_SUPPLIER_EDI" owner="etlsvc" machine="klx-app02">
+      <description>Cleanup step 9 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/cleanup_09.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_EDI_BACKUP_10" type="CMD" chain="KL_SUPPLIER_EDI" owner="batchsvc" machine="klx-app01">
+      <description>Backup step 10 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/backup_10.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_EDI_AGGREGATE_11" type="CMD" chain="KL_SUPPLIER_EDI" owner="batchsvc" machine="klx-app02">
+      <description>Aggregate step 11 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/aggregate_11.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_EDI_EXPORT_12" type="FT" chain="KL_SUPPLIER_EDI" owner="batchsvc" machine="klx-app01">
+      <description>Export step 12 for KL_SUPPLIER_EDI</description>
+      <source>/data/edi/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\edi\export_12.csv</target>
+      <dependsOn condition="success">KL_EDI_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_EDI_IMPORT_13" type="FT" chain="KL_SUPPLIER_EDI" owner="etlsvc" machine="klx-app02">
+      <description>Import step 13 for KL_SUPPLIER_EDI</description>
+      <source>/data/edi/out/import_13.csv</source>
+      <target/>
+      <dependsOn condition="success">KL_EDI_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_EDI_CHECK_14" type="CMD" chain="KL_SUPPLIER_EDI" owner="batchsvc" machine="klx-app01">
+      <description>Check step 14 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/check_14.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_IMPORT_13</dependsOn>
+    </job>
+    <job name="KL_EDI_SUMMARY_15" type="CMD" chain="KL_SUPPLIER_EDI" owner="etlsvc" machine="klx-app02">
+      <description>Summary step 15 for KL_SUPPLIER_EDI</description>
+      <command>/opt/kl/edi/summary_15.sh</command>
+      <parameter name="PARTNER_ID" value="EDI-0042"/>
+      <dependsOn condition="success">KL_EDI_CHECK_14</dependsOn>
+    </job>
+    <job name="KL_ARC_EXTRACT_01" type="CMD" chain="KL_ARCHIVE_PURGE" owner="batchsvc" machine="klx-app02">
+      <description>Extract step 1 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/extract_01.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+    </job>
+    <job name="KL_ARC_VALIDATE_02" type="CMD" chain="KL_ARCHIVE_PURGE" owner="batchsvc" machine="klx-db01">
+      <description>Validate step 2 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/validate_02.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_EXTRACT_01</dependsOn>
+    </job>
+    <job name="KL_ARC_TRANSFORM_03" type="CMD" chain="KL_ARCHIVE_PURGE" owner="batchsvc" machine="klx-db01">
+      <description>Transform step 3 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/transform_03.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_VALIDATE_02</dependsOn>
+    </job>
+    <job name="KL_ARC_TRANSFORM_03" type="CMD" chain="KL_ARCHIVE_PURGE" owner="batchsvc" machine="klx-db01">
+      <description>Transform step 3 for KL_ARCHIVE_PURGE (copy)</description>
+      <command>/opt/kl/arc/transform_03.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+    </job>
+    <job name="KL_ARC_LOAD_04" type="CMD" chain="KL_ARCHIVE_PURGE" owner="finsvc" machine="klx-app02">
+      <description>Load step 4 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/load_04.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_TRANSFORM_03</dependsOn>
+    </job>
+    <job name="KL_ARC_RECONCILE_05" type="CMD" chain="KL_ARCHIVE_PURGE" owner="finsvc" machine="klx-app02">
+      <description>Reconcile step 5 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/reconcile_05.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_LOAD_04</dependsOn>
+    </job>
+    <job name="KL_ARC_NOTIFY_06" type="CMD" chain="KL_ARCHIVE_PURGE" owner="batchsvc" machine="klx-db01">
+      <description>Notify step 6 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/notify_06.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_RECONCILE_05</dependsOn>
+    </job>
+    <job name="KL_ARC_TRANSFER_07" type="FT" chain="KL_ARCHIVE_PURGE" owner="batchsvc" machine="kwin-rpt01">
+      <description>Transfer step 7 for KL_ARCHIVE_PURGE</description>
+      <source>/data/arc/out/transfer_07.csv</source>
+      <target>\\kwin-fs01\drop\arc\transfer_07.csv</target>
+      <dependsOn condition="success">KL_ARC_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_ARC_REPORT_08" type="CMD" chain="KL_ARCHIVE_PURGE" owner="finsvc" machine="klx-app01">
+      <description>Report step 8 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/report_08.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_TRANSFER_07</dependsOn>
+    </job>
+    <job name="KL_ARC_CLEANUP_09" type="CMD" chain="KL_ARCHIVE_PURGE" owner="etlsvc" machine="klx-app02">
+      <description>Cleanup step 9 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/cleanup_09.sh</command>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_REPORT_08</dependsOn>
+    </job>
+    <job name="KL_ARC_BACKUP_10" type="CMD" chain="KL_ARCHIVE_PURGE" owner="finsvc" machine="klx-db01">
+      <description>Backup step 10 for KL_ARCHIVE_PURGE</description>
+      <command>/opt/kl/arc/backup_10.sh</command>
+      <dependsOn condition="success">KL_ARC_CLEANUP_09</dependsOn>
+    </job>
+    <job name="KL_ARC_AGGREGATE_11" type="CMD" chain="KL_ARCHIVE_PURGE" owner="etlsvc" machine="klx-app01">
+      <description>Aggregate step 11 for KL_ARCHIVE_PURGE</description>
+      <command/>
+      <parameter name="RETENTION_DAYS" value="30"/>
+      <dependsOn condition="success">KL_ARC_BACKUP_10</dependsOn>
+    </job>
+    <job name="KL_ARC_EXPORT_12" type="FT" chain="KL_ARCHIVE_PURGE" owner="etlsvc" machine="klx-app02">
+      <description>Export step 12 for KL_ARCHIVE_PURGE</description>
+      <source>/data/arc/out/export_12.csv</source>
+      <target>\\kwin-fs01\drop\arc\export_12.csv</target>
+      <dependsOn condition="success">KL_ARC_AGGREGATE_11</dependsOn>
+    </job>
+    <job name="KL_ARC_IMPORT_13" type="FT" chain="KL_ARCHIVE_PURGE" owner="etlsvc" machine="klx-db01">
+      <description>Import step 13 for KL_ARCHIVE_PURGE</description>
+      <source>/data/arc/out/import_13.csv</source>
+      <target>\\kwin-fs01\drop\arc\import_13.csv</target>
+      <dependsOn condition="success">KL_ARC_EXPORT_12</dependsOn>
+    </job>
+    <job name="KL_HEALTHCHECK_HOURLY" type="CMD" chain="" owner="batchsvc" machine="klx-app01">
+      <description>Standalone maintenance job</description>
+      <command>/opt/kl/ops/kl_healthcheck_hourly.sh</command>
+      <schedule days="daily" time="00:00"/>
+    </job>
+    <job name="KL_LOG_ROTATE" type="CMD" chain="" owner="batchsvc" machine="klx-app01">
+      <description>Standalone maintenance job</description>
+      <command>/opt/kl/ops/kl_log_rotate.sh</command>
+      <schedule days="daily" time="25:30"/>
+    </job>
+    <job name="KL_CERT_CHECK" type="CMD" chain="" owner="batchsvc" machine="klx-app01">
+      <description>Standalone maintenance job</description>
+      <command>/opt/kl/ops/kl_cert_check.sh</command>
+      <schedule days="mon-fry" time="07:00"/>
+    </job>
+    <job name="KL_TEMP_CLEANUP" type="CMD" chain="" owner="batchsvc" machine="klx-app01">
+      <description>Standalone maintenance job</description>
+      <command>/opt/kl/ops/kl_temp_cleanup.sh</command>
+      <schedule days="daily" time="12:00"/>
+      <parameter name="RETENTION_DAYS" value="7"/>
+    </job>
+  </jobs>
+</export>
