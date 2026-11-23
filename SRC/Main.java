@@ -47,6 +47,16 @@ public class Main {
             compareMaps("Job names and occurrences",
                 xmlNames, jsonNames);
 
+            // Compare unique job names
+            int xmlUniqueNames =
+                getUniqueJobNameCount(xmlData.getJobs());
+
+            int jsonUniqueNames =
+                getUniqueJobNameCount(jsonData.getJobs());
+
+            compare("Unique job names",
+                xmlUniqueNames, jsonUniqueNames);
+
             // Compare job types
             System.out.println("\n========== JOB TYPE COMPARISON ==========");
 
@@ -77,6 +87,20 @@ public class Main {
             System.out.println("XML: " + xmlChains);
             System.out.println("JSON: " + jsonChains);
 
+            // Build a safe registry using XML jobs
+            System.out.println("\n========== SAFE JOB REGISTRY ==========");
+
+            JobRegistry registry = new JobRegistry();
+
+            registry.registerAll(xmlData.getJobs());
+
+            registry.printDuplicates();
+
+            System.out.println(
+                "Total jobs preserved in registry: " +
+                registry.getAllJobs().size()
+            );
+
             // Final result
             System.out.println("\n========== FINAL RESULT ==========");
 
@@ -86,6 +110,7 @@ public class Main {
                 && xmlData.getJobs().size() == jsonData.getJobs().size()
                 && xmlData.getSchedules().size() == jsonData.getSchedules().size()
                 && xmlNames.equals(jsonNames)
+                && xmlUniqueNames == jsonUniqueNames
                 && xmlTypes.equals(jsonTypes)
                 && xmlChains.equals(jsonChains);
 
@@ -100,6 +125,7 @@ public class Main {
             }
 
         } catch (XMLLoaderException e) {
+
             System.out.println("IMPORT FAILED: " + e.getMessage());
         }
     }
@@ -107,7 +133,8 @@ public class Main {
     private static void compare(
             String label, int xmlCount, int jsonCount) {
 
-        String status = xmlCount == jsonCount ? "MATCH" : "MISMATCH";
+        String status =
+            xmlCount == jsonCount ? "MATCH" : "MISMATCH";
 
         System.out.println(
             label + " | XML: " + xmlCount +
@@ -137,6 +164,14 @@ public class Main {
         }
 
         return counts;
+    }
+
+    private static int getUniqueJobNameCount(List<Job> jobs) {
+
+        return (int) jobs.stream()
+            .map(Job::getName)
+            .distinct()
+            .count();
     }
 
     private static Map<String, Integer> getJobTypeCounts(

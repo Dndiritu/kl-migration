@@ -45,6 +45,7 @@ public class Chain {
         }
     }
 
+    // Check all dependencies in the chain
     public List<String> findInvalidDependencies() {
 
         List<String> invalidDependencies = new ArrayList<>();
@@ -77,6 +78,38 @@ public class Chain {
                     invalidDependencies.add(
                         job.getName() +
                         " references missing job: " + dependency
+                    );
+                }
+            }
+        }
+
+        return invalidDependencies;
+    }
+
+    // Check dependencies of selected jobs against the entire chain
+    public List<String> findDependenciesOutsideChain(
+            List<Job> selectedJobs) {
+
+        List<String> invalidDependencies = new ArrayList<>();
+
+        // Collect all job names belonging to this chain
+        List<String> chainJobNames = new ArrayList<>();
+
+        for (Job job : jobs) {
+            chainJobNames.add(job.getName());
+        }
+
+        // Check dependencies of the selected jobs
+        for (Job job : selectedJobs) {
+
+            for (String dependency : job.getDependencies()) {
+
+                if (!chainJobNames.contains(dependency)) {
+
+                    invalidDependencies.add(
+                        job.getName() +
+                        " references missing job: " +
+                        dependency
                     );
                 }
             }
