@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customerExport>
+    <jobs>
+        <job name="KL-SHP-LOAD-04" type="CMD" />
+        <job name="KL_SHP_LOAD_04" type="CMD" />
+    </jobs>
+</customerExport>

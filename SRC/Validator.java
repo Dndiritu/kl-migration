@@ -1,6 +1,7 @@
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -21,19 +22,45 @@ public class Validator {
 
     public static void main(String[] args) {
 
+        String inputFile = args.length > 0
+            ? args[0]
+            : "customer_export_fixed.xml";
+
+        String reportFile = args.length > 1
+            ? args[1]
+            : "validation_report_fixed.csv";
+
         try {
-            XMLData data = JsonLoader.load("customer_export.json");
+            // Load the XML export rather than the JSON export.
+            XMLData data = XMLLoader.load(inputFile);
 
             issues.clear();
 
             validate(data);
 
-            writeReport("validation_report.csv");
+            writeReport(reportFile);
 
-            System.out.println("========== VALIDATION REPORT ==========");
+            System.out.println("\n========== VALIDATION REPORT ==========");
+            System.out.println("Input file: " + inputFile);
             System.out.println("Total jobs checked: " + data.getJobs().size());
             System.out.println("Total issues found: " + issues.size());
-            System.out.println("Report saved as validation_report.csv");
+
+            System.out.println("\n========== ISSUE BREAKDOWN ==========");
+
+            Map<String, Integer> issueCounts = new HashMap<>();
+
+            for (String[] issue : issues) {
+                issueCounts.merge(issue[0], 1, Integer::sum);
+            }
+
+            for (Map.Entry<String, Integer> entry :
+                    issueCounts.entrySet()) {
+                System.out.println(
+                    entry.getKey() + ": " + entry.getValue()
+                );
+            }
+
+            System.out.println("\nReport saved as: " + reportFile);
 
         } catch (XMLLoaderException | IOException e) {
             System.out.println("Validation failed: " + e.getMessage());
@@ -163,7 +190,7 @@ public class Validator {
             }
         }
 
-        // 4. Additional check: dependency cycles
+        // 4. Detect dependency cycles
         detectDependencyCycles(jobs);
     }
 
@@ -306,7 +333,10 @@ public class Validator {
             throws IOException {
 
         try (BufferedWriter writer =
-                Files.newBufferedWriter(Path.of(fileName))) {
+                Files.newBufferedWriter(
+                    Path.of(fileName),
+                    StandardCharsets.UTF_8
+                )) {
 
             writer.write("issue_type,job_name,detail");
             writer.newLine();

@@ -1,0 +1,28 @@
+issue_type,job_name,detail
+MISSING_DEPENDENCY,KL_ORD_RECONCILE_05,References nonexistent job: KL_ORD_TRANSFORM_3
+UNDEFINED_MACHINE,KL_ORD_BACKUP_10,Machine is missing or not declared: klx-app03
+MISSING_OWNER,KL_INV_TRANSFORM_03,Job has no owner
+MISSING_DEPENDENCY,KL_INV_CLEANUP_09,References nonexistent job: KL_INV_RECONCILE_05X
+TYPE_SPECIFIC_PROBLEM,KL_FIN_BACKUP_10,Command job has no command
+TYPE_SPECIFIC_PROBLEM,KL_CUS_TRANSFER_07,File transfer job has no target
+UNDEFINED_MACHINE,KL_CUS_AGGREGATE_11,Machine is missing or not declared: kwin-fs1
+MISSING_OWNER,KL_WHS_TRANSFER_07,Job has no owner
+UNDEFINED_CHAIN,KL_WHS_EXPORT_12,Chain is missing or not declared: KL_WAREHOUSE_ELT
+TYPE_SPECIFIC_PROBLEM,KL_WHS_CHECK_14,Command job has no command
+MISSING_DEPENDENCY,KL_RPT_NOTIFY_06,References nonexistent job: KL_RPT_AGGREGATE_99
+MISSING_DEPENDENCY,KL_PAY_REPORT_08,References nonexistent job: KL_PAY_LOADD_04
+UNDEFINED_CHAIN,KL_PAY_AGGREGATE_11,Chain is missing or not declared: KL_PAYROLL
+MISSING_OWNER,KL_EDI_LOAD_04,Job has no owner
+TYPE_SPECIFIC_PROBLEM,KL_EDI_IMPORT_13,File transfer job has no target
+TYPE_SPECIFIC_PROBLEM,KL_ARC_AGGREGATE_11,Command job has no command
+UNDEFINED_CHAIN,KL_HEALTHCHECK_HOURLY,Chain is missing or not declared: 
+UNDEFINED_CHAIN,KL_LOG_ROTATE,Chain is missing or not declared: 
+UNDEFINED_CHAIN,KL_CERT_CHECK,Chain is missing or not declared: 
+UNDEFINED_CHAIN,KL_TEMP_CLEANUP,Chain is missing or not declared: 
+DUPLICATE_NAME,KL_SHP_BACKUP_10,Job name occurs 2 times
+DUPLICATE_NAME,KL_SHP_BACKUP_10,Job name occurs 2 times
+DUPLICATE_NAME,KL_ARC_TRANSFORM_03,Job name occurs 2 times
+DUPLICATE_NAME,KL_ARC_TRANSFORM_03,Job name occurs 2 times
+INVALID_SCHEDULE,KL_LOG_ROTATE,Invalid 24-hour time: 25:30
+INVALID_SCHEDULE,KL_CERT_CHECK,Invalid schedule days: mon-fry
+DEPENDENCY_CYCLE,KL_ARC_TRANSFER_07,Circular dependency detected: KL_ARC_CLEANUP_09 -> KL_ARC_REPORT_08 -> KL_ARC_TRANSFER_07 -> KL_ARC_CLEANUP_09
