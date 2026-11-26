@@ -1,0 +1,2523 @@
+{
+  "platform": "NewPlatform",
+  "sourceSystem": "LegacySched",
+  "customer": "Kestrel Logistics",
+  "processDefinitions": [
+    {
+      "name": "KL_ORD_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Extract step 1 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/extract_01.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "kl orders validate 02",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Validate step 2 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/validate_02.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Transform step 3 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/transform_03.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "kl orders validate 02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Reconcile step 5 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_TRANSFORM_3",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Notify step 6 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/notify_06.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_RECONCILE_05",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Transfer step 7 for KL_ORDERS_NIGHTLY",
+      "sourceFile": "/data/ord/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\ord\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Report step 8 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/legacy/filter_failed_orders.sh orders.csv failed_orders.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Cleanup step 9 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/cleanup_09.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app03",
+      "description": "Backup step 10 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Aggregate step 11 for KL_ORDERS_NIGHTLY",
+      "script": "/opt/kl/ord/aggregate_11.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Export step 12 for KL_ORDERS_NIGHTLY",
+      "sourceFile": "/data/ord/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\ord\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ORD_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "kwin-fs01",
+      "description": "Import step 13 for KL_ORDERS_NIGHTLY",
+      "sourceFile": "/data/ord/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\ord\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ORD_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Extract step 1 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/extract_01.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_INV_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Validate step 2 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/validate_02.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "",
+      "server": "klx-db01",
+      "description": "Transform step 3 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/transform_03.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Load step 4 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/load_04.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Reconcile step 5 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Notify step 6 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/notify_06.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_RECONCILE_05",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Transfer step 7 for KL_INVENTORY_SYNC",
+      "sourceFile": "/data/inv/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\inv\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Report step 8 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/report_08.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Cleanup step 9 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/cleanup_09.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_RECONCILE_05X",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Backup step 10 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Aggregate step 11 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/aggregate_11.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Export step 12 for KL_INVENTORY_SYNC",
+      "sourceFile": "/data/inv/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\inv\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "kwin-rpt01",
+      "description": "Import step 13 for KL_INVENTORY_SYNC",
+      "sourceFile": "/data/inv/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\inv\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_CHECK_14",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Check step 14 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/check_14.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_IMPORT_13",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_SUMMARY_15",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Summary step 15 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/summary_15.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_CHECK_14",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_INV_EXTRACT_16",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Extract step 16 for KL_INVENTORY_SYNC",
+      "script": "/opt/kl/inv/extract_16.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_INV_SUMMARY_15",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Extract step 1 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/extract_01.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_SHP_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Validate step 2 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/validate_02.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Transform step 3 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/transform_03.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL-SHP-LOAD-04",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Load step 4 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/load_04.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Reconcile step 5 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL-SHP-LOAD-04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Notify step 6 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/notify_06.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_RECONCILE_05",
+          "onStatus": "Error"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Transfer step 7 for KL_SHIPMENTS_DAILY",
+      "sourceFile": "/data/shp/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\shp\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Report step 8 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/legacy/shipment_status_summary.sh shipments.csv shipment_summary.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Cleanup step 9 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/cleanup_09.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Backup step 10 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Backup step 10 for KL_SHIPMENTS_DAILY (copy)",
+      "script": "/opt/kl/shp/backup_10.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_SHP_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Aggregate step 11 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/aggregate_11.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "kwin-rpt01",
+      "description": "Export step 12 for KL_SHIPMENTS_DAILY",
+      "sourceFile": "/data/shp/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\shp\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "kwin-rpt01",
+      "description": "Import step 13 for KL_SHIPMENTS_DAILY",
+      "sourceFile": "/data/shp/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\shp\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_SHP_CHECK_14",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Check step 14 for KL_SHIPMENTS_DAILY",
+      "script": "/opt/kl/shp/check_14.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_SHP_IMPORT_13",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Extract step 1 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/extract_01.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": []
+    },
+    {
+      "name": "KL_FIN_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Validate step 2 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/validate_02.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Transform step 3 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/transform_03.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Load step 4 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/load_04.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "Kl_Fin_Reconcile_05",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Reconcile step 5 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/reconcile_05.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Notify step 6 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/notify_06.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "Kl_Fin_Reconcile_05",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Transfer step 7 for KL_FINANCE_CLOSE",
+      "sourceFile": "/data/fin/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\fin\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Report step 8 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/report_08.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Cleanup step 9 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/cleanup_09.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_REPORT_08",
+          "onStatus": "Error"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Backup step 10 for KL_FINANCE_CLOSE",
+      "script": "",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Aggregate step 11 for KL_FINANCE_CLOSE",
+      "script": "/opt/kl/fin/aggregate_11.sh",
+      "parameters": [
+        {
+          "name": "REGION",
+          "value": "EU"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Export step 12 for KL_FINANCE_CLOSE",
+      "sourceFile": "/data/fin/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\fin\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_FIN_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "kwin-rpt01",
+      "description": "Import step 13 for KL_FINANCE_CLOSE",
+      "sourceFile": "/data/fin/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\fin\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_FIN_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Extract step 1 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/extract_01.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_CUS_VALIDATE_02",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Validate step 2 for KL_CUSTOMER_FEEDS",
+      "sourceFile": "",
+      "targetFile": "",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Transform step 3 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/transform_03.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Load step 4 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/load_04.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Reconcile step 5 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_NOTIFY_06!",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Notify step 6 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/notify_06.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_RECONCILE_05",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Transfer step 7 for KL_CUSTOMER_FEEDS",
+      "sourceFile": "/data/cus/out/transfer_07.csv",
+      "targetFile": "",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_NOTIFY_06!",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Report step 8 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/report_08.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Cleanup step 9 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/cleanup_09.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Backup step 10 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_CLEANUP_09",
+          "onStatus": "Error"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "kwin-fs1",
+      "description": "Aggregate step 11 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/aggregate_11.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Export step 12 for KL_CUSTOMER_FEEDS",
+      "sourceFile": "/data/cus/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\cus\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_CUS_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "kwin-fs01",
+      "description": "Import step 13 for KL_CUSTOMER_FEEDS",
+      "sourceFile": "/data/cus/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\cus\\import_13.csv",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_CUS_CHECK_14",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Check step 14 for KL_CUSTOMER_FEEDS",
+      "script": "/opt/kl/cus/check_14.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_CUS_IMPORT_13",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Extract step 1 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/extract_01.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_WHS_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Validate step 2 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/validate_02.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Transform step 3 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/transform_03.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Load step 4 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/load_04.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Reconcile step 5 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Notify step 6 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/notify_06.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_RECONCILE_05",
+          "onStatus": "Error"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "",
+      "server": "klx-app01",
+      "description": "Transfer step 7 for KL_WAREHOUSE_ETL",
+      "sourceFile": "/data/whs/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\whs\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Report step 8 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/report_08.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Cleanup step 9 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/cleanup_09.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Backup step 10 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Aggregate step 11 for KL_WAREHOUSE_ETL",
+      "script": "/opt/kl/whs/aggregate_11.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Export step 12 for KL_WAREHOUSE_ETL",
+      "sourceFile": "/data/whs/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\whs\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Import step 13 for KL_WAREHOUSE_ETL",
+      "sourceFile": "/data/whs/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\whs\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_WHS_CHECK_14",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Check step 14 for KL_WAREHOUSE_ETL",
+      "script": "",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_WHS_IMPORT_13",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Extract step 1 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/extract_01.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_RPT_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Validate step 2 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/validate_02.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Transform step 3 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/transform_03.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Load step 4 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/load_04.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Reconcile step 5 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Notify step 6 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/notify_06.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_AGGREGATE_99",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Transfer step 7 for KL_REPORTING_WEEKLY",
+      "sourceFile": "/data/rpt/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\rpt\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Report step 8 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/report_08.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Cleanup step 9 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/cleanup_09.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Backup step 10 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Aggregate step 11 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/aggregate_11.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Export step 12 for KL_REPORTING_WEEKLY",
+      "sourceFile": "/data/rpt/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\rpt\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Import step 13 for KL_REPORTING_WEEKLY",
+      "sourceFile": "/data/rpt/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\rpt\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_RPT_CHECK_14",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Check step 14 for KL_REPORTING_WEEKLY",
+      "script": "/opt/kl/rpt/check_14.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_RPT_IMPORT_13",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Extract step 1 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/extract_01.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_PAY_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Validate step 2 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/validate_02.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Transform step 3 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/transform_03.sh",
+      "parameters": [],
+      "preconditions": []
+    },
+    {
+      "name": "KL_PAY_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Load step 4 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/load_04.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Reconcile step 5 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Notify step 6 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/notify_06.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_RECONCILE_05",
+          "onStatus": "Error"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Transfer step 7 for KL_PAYROLL_PREP",
+      "sourceFile": "/data/pay/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\pay\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Report step 8 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/report_08.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_LOADD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Cleanup step 9 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/cleanup_09.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Backup step 10 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Aggregate step 11 for KL_PAYROLL_PREP",
+      "script": "/opt/kl/pay/aggregate_11.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Export step 12 for KL_PAYROLL_PREP",
+      "sourceFile": "/data/pay/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\pay\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_PAY_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Import step 13 for KL_PAYROLL_PREP",
+      "sourceFile": "/data/pay/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\pay\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_PAY_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Extract step 1 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/extract_01.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": []
+    },
+    {
+      "name": "KL_EDI_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Validate step 2 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/legacy/validate_csv_columns.sh orders.csv 5",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Transform step 3 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/transform_03.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "",
+      "server": "klx-db01",
+      "description": "Load step 4 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/load_04.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Reconcile step 5 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/reconcile_05.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Notify step 6 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/notify_06.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_RECONCILE_05",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Transfer step 7 for KL_SUPPLIER_EDI",
+      "sourceFile": "/data/edi/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\edi\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_NOTIFY_06",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Report step 8 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/report_08.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Cleanup step 9 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/cleanup_09.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Backup step 10 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/backup_10.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Aggregate step 11 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/aggregate_11.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0024"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Export step 12 for KL_SUPPLIER_EDI",
+      "sourceFile": "/data/edi/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\edi\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Import step 13 for KL_SUPPLIER_EDI",
+      "sourceFile": "/data/edi/out/import_13.csv",
+      "targetFile": "",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_CHECK_14",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Check step 14 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/check_14.sh",
+      "parameters": [
+        {
+          "name": "PARTNER_ID",
+          "value": "EDI-0042"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_IMPORT_13",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_EDI_SUMMARY_15",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Summary step 15 for KL_SUPPLIER_EDI",
+      "script": "/opt/kl/edi/summary_15.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_EDI_CHECK_14",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_EXTRACT_01",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app02",
+      "description": "Extract step 1 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/extract_01.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": []
+    },
+    {
+      "name": "KL_ARC_VALIDATE_02",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Validate step 2 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/validate_02.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_EXTRACT_01",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Transform step 3 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/transform_03.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_VALIDATE_02",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_TRANSFORM_03",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Transform step 3 for KL_ARCHIVE_PURGE (copy)",
+      "script": "/opt/kl/arc/transform_03.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": []
+    },
+    {
+      "name": "KL_ARC_LOAD_04",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Load step 4 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/load_04.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_TRANSFORM_03",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_RECONCILE_05",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app02",
+      "description": "Reconcile step 5 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/reconcile_05.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_LOAD_04",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_NOTIFY_06",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-db01",
+      "description": "Notify step 6 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/notify_06.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_RECONCILE_05",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_TRANSFER_07",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "batchsvc",
+      "server": "kwin-rpt01",
+      "description": "Transfer step 7 for KL_ARCHIVE_PURGE",
+      "sourceFile": "/data/arc/out/transfer_07.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\arc\\transfer_07.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_REPORT_08",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-app01",
+      "description": "Report step 8 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/report_08.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_TRANSFER_07",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_CLEANUP_09",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Cleanup step 9 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/cleanup_09.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_REPORT_08",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_BACKUP_10",
+      "definitionType": "OS",
+      "runAs": "finsvc",
+      "server": "klx-db01",
+      "description": "Backup step 10 for KL_ARCHIVE_PURGE",
+      "script": "/opt/kl/arc/backup_10.sh",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_CLEANUP_09",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_AGGREGATE_11",
+      "definitionType": "OS",
+      "runAs": "etlsvc",
+      "server": "klx-app01",
+      "description": "Aggregate step 11 for KL_ARCHIVE_PURGE",
+      "script": "",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "30"
+        }
+      ],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_BACKUP_10",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_EXPORT_12",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-app02",
+      "description": "Export step 12 for KL_ARCHIVE_PURGE",
+      "sourceFile": "/data/arc/out/export_12.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\arc\\export_12.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_AGGREGATE_11",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_ARC_IMPORT_13",
+      "definitionType": "FILE_TRANSFER",
+      "runAs": "etlsvc",
+      "server": "klx-db01",
+      "description": "Import step 13 for KL_ARCHIVE_PURGE",
+      "sourceFile": "/data/arc/out/import_13.csv",
+      "targetFile": "\\\\kwin-fs01\\drop\\arc\\import_13.csv",
+      "parameters": [],
+      "preconditions": [
+        {
+          "waitFor": "KL_ARC_EXPORT_12",
+          "onStatus": "Completed"
+        }
+      ]
+    },
+    {
+      "name": "KL_HEALTHCHECK_HOURLY",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Standalone maintenance job",
+      "script": "/opt/kl/ops/kl_healthcheck_hourly.sh",
+      "parameters": [],
+      "preconditions": [],
+      "submitFrame": {
+        "days": "daily",
+        "startTime": "00:00"
+      }
+    },
+    {
+      "name": "KL_LOG_ROTATE",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Standalone maintenance job",
+      "script": "/opt/kl/ops/kl_log_rotate.sh",
+      "parameters": [],
+      "preconditions": [],
+      "submitFrame": {
+        "days": "daily",
+        "startTime": "25:30"
+      }
+    },
+    {
+      "name": "KL_CERT_CHECK",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Standalone maintenance job",
+      "script": "/opt/kl/ops/kl_cert_check.sh",
+      "parameters": [],
+      "preconditions": [],
+      "submitFrame": {
+        "days": "mon-fry",
+        "startTime": "07:00"
+      }
+    },
+    {
+      "name": "KL_TEMP_CLEANUP",
+      "definitionType": "OS",
+      "runAs": "batchsvc",
+      "server": "klx-app01",
+      "description": "Standalone maintenance job",
+      "script": "/opt/kl/ops/kl_temp_cleanup.sh",
+      "parameters": [
+        {
+          "name": "RETENTION_DAYS",
+          "value": "7"
+        }
+      ],
+      "preconditions": [],
+      "submitFrame": {
+        "days": "daily",
+        "startTime": "12:00"
+      }
+    }
+  ],
+  "chains": [
+    {
+      "name": "KL_ORDERS_NIGHTLY",
+      "submitFrame": {
+        "days": "mon-fri",
+        "startTime": "01:00"
+      },
+      "steps": [
+        "KL_ORD_EXTRACT_01",
+        "kl orders validate 02",
+        "KL_ORD_TRANSFORM_03",
+        "KL_ORD_RECONCILE_05",
+        "KL_ORD_NOTIFY_06",
+        "KL_ORD_TRANSFER_07",
+        "KL_ORD_REPORT_08",
+        "KL_ORD_CLEANUP_09",
+        "KL_ORD_BACKUP_10",
+        "KL_ORD_AGGREGATE_11",
+        "KL_ORD_EXPORT_12",
+        "KL_ORD_IMPORT_13"
+      ]
+    },
+    {
+      "name": "KL_INVENTORY_SYNC",
+      "submitFrame": {
+        "days": "daily",
+        "startTime": "02:30"
+      },
+      "steps": [
+        "KL_INV_EXTRACT_01",
+        "KL_INV_VALIDATE_02",
+        "KL_INV_TRANSFORM_03",
+        "KL_INV_LOAD_04",
+        "KL_INV_RECONCILE_05",
+        "KL_INV_NOTIFY_06",
+        "KL_INV_TRANSFER_07",
+        "KL_INV_REPORT_08",
+        "KL_INV_CLEANUP_09",
+        "KL_INV_BACKUP_10",
+        "KL_INV_AGGREGATE_11",
+        "KL_INV_EXPORT_12",
+        "KL_INV_IMPORT_13",
+        "KL_INV_CHECK_14",
+        "KL_INV_SUMMARY_15",
+        "KL_INV_EXTRACT_16"
+      ]
+    },
+    {
+      "name": "KL_SHIPMENTS_DAILY",
+      "submitFrame": {
+        "days": "mon-sat",
+        "startTime": "04:00"
+      },
+      "steps": [
+        "KL_SHP_EXTRACT_01",
+        "KL_SHP_VALIDATE_02",
+        "KL_SHP_TRANSFORM_03",
+        "KL-SHP-LOAD-04",
+        "KL_SHP_RECONCILE_05",
+        "KL_SHP_NOTIFY_06",
+        "KL_SHP_TRANSFER_07",
+        "KL_SHP_REPORT_08",
+        "KL_SHP_CLEANUP_09",
+        "KL_SHP_BACKUP_10",
+        "KL_SHP_BACKUP_10",
+        "KL_SHP_AGGREGATE_11",
+        "KL_SHP_EXPORT_12",
+        "KL_SHP_IMPORT_13",
+        "KL_SHP_CHECK_14"
+      ]
+    },
+    {
+      "name": "KL_FINANCE_CLOSE",
+      "submitFrame": {
+        "days": "mon-fri",
+        "startTime": "22:00"
+      },
+      "steps": [
+        "KL_FIN_EXTRACT_01",
+        "KL_FIN_VALIDATE_02",
+        "KL_FIN_TRANSFORM_03",
+        "KL_FIN_LOAD_04",
+        "Kl_Fin_Reconcile_05",
+        "KL_FIN_NOTIFY_06",
+        "KL_FIN_TRANSFER_07",
+        "KL_FIN_REPORT_08",
+        "KL_FIN_CLEANUP_09",
+        "KL_FIN_BACKUP_10",
+        "KL_FIN_AGGREGATE_11",
+        "KL_FIN_EXPORT_12",
+        "KL_FIN_IMPORT_13"
+      ]
+    },
+    {
+      "name": "KL_CUSTOMER_FEEDS",
+      "submitFrame": {
+        "days": "daily",
+        "startTime": "05:30"
+      },
+      "steps": [
+        "KL_CUS_EXTRACT_01",
+        "KL_CUS_VALIDATE_02",
+        "KL_CUS_TRANSFORM_03",
+        "KL_CUS_LOAD_04",
+        "KL_CUS_RECONCILE_05",
+        "KL_CUS_NOTIFY_06!",
+        "KL_CUS_TRANSFER_07",
+        "KL_CUS_REPORT_08",
+        "KL_CUS_CLEANUP_09",
+        "KL_CUS_BACKUP_10",
+        "KL_CUS_AGGREGATE_11",
+        "KL_CUS_EXPORT_12",
+        "KL_CUS_IMPORT_13",
+        "KL_CUS_CHECK_14"
+      ]
+    },
+    {
+      "name": "KL_WAREHOUSE_ETL",
+      "submitFrame": {
+        "days": "mon-fri",
+        "startTime": "03:00"
+      },
+      "steps": [
+        "KL_WHS_EXTRACT_01",
+        "KL_WHS_VALIDATE_02",
+        "KL_WHS_TRANSFORM_03",
+        "KL_WHS_LOAD_04",
+        "KL_WHS_RECONCILE_05",
+        "KL_WHS_NOTIFY_06",
+        "KL_WHS_TRANSFER_07",
+        "KL_WHS_REPORT_08",
+        "KL_WHS_CLEANUP_09",
+        "KL_WHS_BACKUP_10",
+        "KL_WHS_AGGREGATE_11",
+        "KL_WHS_IMPORT_13",
+        "KL_WHS_CHECK_14"
+      ]
+    },
+    {
+      "name": "KL_REPORTING_WEEKLY",
+      "submitFrame": {
+        "days": "daily",
+        "startTime": "06:00"
+      },
+      "steps": [
+        "KL_RPT_EXTRACT_01",
+        "KL_RPT_VALIDATE_02",
+        "KL_RPT_TRANSFORM_03",
+        "KL_RPT_LOAD_04",
+        "KL_RPT_RECONCILE_05",
+        "KL_RPT_NOTIFY_06",
+        "KL_RPT_TRANSFER_07",
+        "KL_RPT_REPORT_08",
+        "KL_RPT_CLEANUP_09",
+        "KL_RPT_BACKUP_10",
+        "KL_RPT_AGGREGATE_11",
+        "KL_RPT_EXPORT_12",
+        "KL_RPT_IMPORT_13",
+        "KL_RPT_CHECK_14"
+      ]
+    },
+    {
+      "name": "KL_PAYROLL_PREP",
+      "submitFrame": {
+        "days": "fri",
+        "startTime": "20:00"
+      },
+      "steps": [
+        "KL_PAY_EXTRACT_01",
+        "KL_PAY_VALIDATE_02",
+        "KL_PAY_TRANSFORM_03",
+        "KL_PAY_LOAD_04",
+        "KL_PAY_RECONCILE_05",
+        "KL_PAY_NOTIFY_06",
+        "KL_PAY_TRANSFER_07",
+        "KL_PAY_REPORT_08",
+        "KL_PAY_CLEANUP_09",
+        "KL_PAY_BACKUP_10",
+        "KL_PAY_EXPORT_12",
+        "KL_PAY_IMPORT_13"
+      ]
+    },
+    {
+      "name": "KL_SUPPLIER_EDI",
+      "submitFrame": {
+        "days": "daily",
+        "startTime": "12:30"
+      },
+      "steps": [
+        "KL_EDI_EXTRACT_01",
+        "KL_EDI_VALIDATE_02",
+        "KL_EDI_TRANSFORM_03",
+        "KL_EDI_LOAD_04",
+        "KL_EDI_RECONCILE_05",
+        "KL_EDI_NOTIFY_06",
+        "KL_EDI_TRANSFER_07",
+        "KL_EDI_REPORT_08",
+        "KL_EDI_CLEANUP_09",
+        "KL_EDI_BACKUP_10",
+        "KL_EDI_AGGREGATE_11",
+        "KL_EDI_EXPORT_12",
+        "KL_EDI_IMPORT_13",
+        "KL_EDI_CHECK_14",
+        "KL_EDI_SUMMARY_15"
+      ]
+    },
+    {
+      "name": "KL_ARCHIVE_PURGE",
+      "submitFrame": {
+        "days": "sat",
+        "startTime": "23:00"
+      },
+      "steps": [
+        "KL_ARC_EXTRACT_01",
+        "KL_ARC_VALIDATE_02",
+        "KL_ARC_TRANSFORM_03",
+        "KL_ARC_TRANSFORM_03",
+        "KL_ARC_LOAD_04",
+        "KL_ARC_RECONCILE_05",
+        "KL_ARC_NOTIFY_06",
+        "KL_ARC_TRANSFER_07",
+        "KL_ARC_REPORT_08",
+        "KL_ARC_CLEANUP_09",
+        "KL_ARC_BACKUP_10",
+        "KL_ARC_AGGREGATE_11",
+        "KL_ARC_EXPORT_12",
+        "KL_ARC_IMPORT_13"
+      ]
+    },
+    {
+      "name": "KL_WAREHOUSE_ELT",
+      "submitFrame": null,
+      "steps": [
+        "KL_WHS_EXPORT_12"
+      ]
+    },
+    {
+      "name": "KL_PAYROLL",
+      "submitFrame": null,
+      "steps": [
+        "KL_PAY_AGGREGATE_11"
+      ]
+    }
+  ]
+}

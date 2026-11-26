@@ -1,6 +1,7 @@
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public abstract class Job implements Checkable {
 
@@ -9,21 +10,38 @@ public abstract class Job implements Checkable {
     private final String owner;
     private final String machine;
     private final String description;
-    private final List<String> dependencies;
 
+    private final List<JobDependency> dependencyDetails;
+    private final List<JobParameter> parameters;
+
+    // Backward-compatible constructor
     public Job(String name, String chain, String owner,
                String machine, String description,
                List<String> dependencies) {
+
+        this(name, chain, owner, machine, description,
+             dependencies.stream()
+                 .map(dep -> new JobDependency(dep, "success"))
+                 .collect(Collectors.toList()),
+             new ArrayList<>());
+    }
+
+    // Extended constructor
+    public Job(String name, String chain, String owner,
+               String machine, String description,
+               List<JobDependency> dependencies,
+               List<JobParameter> parameters) {
 
         this.name = name;
         this.chain = chain;
         this.owner = owner;
         this.machine = machine;
         this.description = description;
-        this.dependencies = new ArrayList<>(dependencies);
+
+        this.dependencyDetails = new ArrayList<>(dependencies);
+        this.parameters = new ArrayList<>(parameters);
     }
 
-    // Getters
     public String getName() {
         return name;
     }
@@ -44,8 +62,19 @@ public abstract class Job implements Checkable {
         return description;
     }
 
+    // Existing method: returns dependency names
     public List<String> getDependencies() {
-        return new ArrayList<>(dependencies);
+        return dependencyDetails.stream()
+            .map(JobDependency::getJobName)
+            .collect(Collectors.toList());
+    }
+
+    public List<JobDependency> getDependencyDetails() {
+        return new ArrayList<>(dependencyDetails);
+    }
+
+    public List<JobParameter> getParameters() {
+        return new ArrayList<>(parameters);
     }
 
     public abstract String getType();

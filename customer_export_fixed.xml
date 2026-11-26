@@ -1193,7 +1193,7 @@
                   
             <command>/opt/kl/pay/report_08.sh</command>
                   
-            <dependsOn condition="success">KL_PAY_LOADD_04</dependsOn>
+            <dependsOn condition="success">KL_PAY_TRANSFER_07</dependsOn>
                 
         </job>
             
@@ -1552,6 +1552,8 @@
             <command>/opt/kl/arc/backup_10.sh</command>
                   
             <dependsOn condition="success">KL_ARC_CLEANUP_09</dependsOn>
+
+            <parameter name="RETENTION_DAYS" value="30"/>
                 
         </job>
             
@@ -1617,7 +1619,7 @@
                   
             <command>/opt/kl/ops/kl_cert_check.sh</command>
                   
-            <schedule days="mon-fry" time="07:00"/>
+            <schedule days="mon-fri" time="07:00"/>
                 
         </job>
             

@@ -4,11 +4,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -33,18 +31,22 @@ public class XMLLoader {
             factory.setFeature(
                 XMLConstants.FEATURE_SECURE_PROCESSING, true
             );
+
             factory.setFeature(
                 "http://apache.org/xml/features/disallow-doctype-decl",
                 true
             );
+
             factory.setFeature(
                 "http://xml.org/sax/features/external-general-entities",
                 false
             );
+
             factory.setFeature(
                 "http://xml.org/sax/features/external-parameter-entities",
                 false
             );
+
             factory.setXIncludeAware(false);
             factory.setExpandEntityReferences(false);
 
@@ -56,21 +58,30 @@ public class XMLLoader {
 
             List<Machine> machines = readMachines(root);
             List<Job> jobs = readJobs(root);
+
             List<Schedule> schedules = new ArrayList<>();
-            List<Chain> chains = readChains(root, jobs, schedules);
+
+            List<Chain> chains =
+                readChains(root, jobs, schedules);
 
             // Read schedules belonging to standalone jobs.
             Element jobsElement = getFirstChild(root, "jobs");
-            NodeList jobNodes = jobsElement.getElementsByTagName("job");
+
+            NodeList jobNodes =
+                jobsElement.getElementsByTagName("job");
 
             for (int i = 0; i < jobNodes.getLength(); i++) {
-                Element jobElement = (Element) jobNodes.item(i);
+
+                Element jobElement =
+                    (Element) jobNodes.item(i);
 
                 if (jobElement.getAttribute("chain").isBlank()) {
+
                     Element scheduleElement =
                         getFirstChild(jobElement, "schedule");
 
                     if (scheduleElement != null) {
+
                         schedules.add(new Schedule(
                             jobElement.getAttribute("name"),
                             scheduleElement.getAttribute("days"),
@@ -85,8 +96,11 @@ public class XMLLoader {
             );
 
         } catch (XMLLoaderException e) {
+
             throw e;
+
         } catch (Exception e) {
+
             throw new XMLLoaderException(
                 "Unable to read or parse XML file: " +
                 filePath + ". " + e.getMessage(), e
@@ -94,7 +108,9 @@ public class XMLLoader {
         }
     }
 
+    // Read machines from XML
     private static List<Machine> readMachines(Element root) {
+
         List<Machine> machines = new ArrayList<>();
 
         Element machinesElement =
@@ -104,6 +120,7 @@ public class XMLLoader {
             machinesElement.getElementsByTagName("machine");
 
         for (int i = 0; i < nodes.getLength(); i++) {
+
             Element element = (Element) nodes.item(i);
 
             machines.add(new Machine(
@@ -115,15 +132,19 @@ public class XMLLoader {
         return machines;
     }
 
+    // Read jobs, dependencies, and parameters from XML
     private static List<Job> readJobs(Element root)
             throws XMLLoaderException {
 
         List<Job> jobs = new ArrayList<>();
 
         Element jobsElement = getFirstChild(root, "jobs");
-        NodeList nodes = jobsElement.getElementsByTagName("job");
+
+        NodeList nodes =
+            jobsElement.getElementsByTagName("job");
 
         for (int i = 0; i < nodes.getLength(); i++) {
+
             Element element = (Element) nodes.item(i);
 
             String name = element.getAttribute("name");
@@ -135,33 +156,88 @@ public class XMLLoader {
             String description =
                 getChildText(element, "description");
 
-            List<String> dependencies = new ArrayList<>();
+            // Read dependencies and their conditions
+            List<JobDependency> dependencies =
+                new ArrayList<>();
 
             NodeList dependencyNodes =
                 element.getElementsByTagName("dependsOn");
 
             for (int j = 0; j < dependencyNodes.getLength(); j++) {
+
+                Element dependencyElement =
+                    (Element) dependencyNodes.item(j);
+
+                String dependencyName =
+                    dependencyElement.getTextContent().trim();
+
+                String condition =
+                    dependencyElement.getAttribute("condition");
+
                 dependencies.add(
-                    dependencyNodes.item(j).getTextContent().trim()
+                    new JobDependency(
+                        dependencyName,
+                        condition
+                    )
                 );
             }
 
+            // Read job parameters
+            List<JobParameter> parameters =
+                new ArrayList<>();
+
+            NodeList parameterNodes =
+                element.getElementsByTagName("parameter");
+
+            for (int j = 0; j < parameterNodes.getLength(); j++) {
+
+                Element parameterElement =
+                    (Element) parameterNodes.item(j);
+
+                String parameterName =
+                    parameterElement.getAttribute("name");
+
+                String parameterValue =
+                    parameterElement.getAttribute("value");
+
+                parameters.add(
+                    new JobParameter(
+                        parameterName,
+                        parameterValue
+                    )
+                );
+            }
+
+            // Create the appropriate job type
             if ("CMD".equals(type)) {
+
                 jobs.add(new CommandJob(
-                    name, chain, owner, machine, description,
+                    name,
+                    chain,
+                    owner,
+                    machine,
+                    description,
                     dependencies,
+                    parameters,
                     getChildText(element, "command")
                 ));
 
             } else if ("FT".equals(type)) {
+
                 jobs.add(new FileTransferJob(
-                    name, chain, owner, machine, description,
+                    name,
+                    chain,
+                    owner,
+                    machine,
+                    description,
                     dependencies,
+                    parameters,
                     getChildText(element, "source"),
                     getChildText(element, "target")
                 ));
 
             } else {
+
                 throw new XMLLoaderException(
                     "Unknown job type '" + type +
                     "' for job: " + name
@@ -172,6 +248,7 @@ public class XMLLoader {
         return jobs;
     }
 
+    // Group jobs into their respective chains
     private static List<Chain> readChains(
             Element root,
             List<Job> jobs,
@@ -183,9 +260,11 @@ public class XMLLoader {
             new LinkedHashMap<>();
 
         for (Job job : jobs) {
+
             jobsByChain
                 .computeIfAbsent(
-                    job.getChain(), key -> new ArrayList<>()
+                    job.getChain(),
+                    key -> new ArrayList<>()
                 )
                 .add(job);
         }
@@ -197,6 +276,7 @@ public class XMLLoader {
             chainsElement.getElementsByTagName("chain");
 
         for (int i = 0; i < nodes.getLength(); i++) {
+
             Element element = (Element) nodes.item(i);
 
             String name = element.getAttribute("name");
@@ -204,26 +284,39 @@ public class XMLLoader {
             Element scheduleElement =
                 getFirstChild(element, "schedule");
 
-            String days = scheduleElement.getAttribute("days");
-            String time = scheduleElement.getAttribute("time");
+            String days =
+                scheduleElement.getAttribute("days");
 
-            schedules.add(new Schedule(name, days, time));
+            String time =
+                scheduleElement.getAttribute("time");
+
+            schedules.add(
+                new Schedule(name, days, time)
+            );
 
             List<Job> chainJobs =
-                jobsByChain.getOrDefault(name, new ArrayList<>());
+                jobsByChain.getOrDefault(
+                    name,
+                    new ArrayList<>()
+                );
 
-            chains.add(new Chain(name, days, time, chainJobs));
+            chains.add(
+                new Chain(name, days, time, chainJobs)
+            );
         }
 
         return chains;
     }
 
+    // Get a direct child element by tag name
     private static Element getFirstChild(
             Element parent, String tagName) {
 
-        NodeList nodes = parent.getElementsByTagName(tagName);
+        NodeList nodes =
+            parent.getElementsByTagName(tagName);
 
         for (int i = 0; i < nodes.getLength(); i++) {
+
             Element element = (Element) nodes.item(i);
 
             if (element.getParentNode() == parent) {
@@ -234,10 +327,12 @@ public class XMLLoader {
         return null;
     }
 
+    // Get text content of a child element
     private static String getChildText(
             Element parent, String tagName) {
 
-        Element child = getFirstChild(parent, tagName);
+        Element child =
+            getFirstChild(parent, tagName);
 
         if (child == null) {
             return null;
